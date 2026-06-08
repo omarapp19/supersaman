@@ -11,7 +11,7 @@ import { Login } from './components/Login';
 import { SugeridosView } from './components/SugeridosView';
 import { auth, isFirebaseConfigured, db, bootstrapFirestore } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import { mockOrders, mockAisles } from './data';
 import { MapPin, LogOut } from 'lucide-react';
 
@@ -135,6 +135,34 @@ export default function App() {
     }
   };
 
+  const handleDeleteAisle = async (aisleId: string) => {
+    if (isFirebaseConfigured) {
+      try {
+        // Delete all products in the aisle first
+        const productsSnap = await getDocs(collection(db, 'aisles', aisleId, 'products'));
+        for (const productDoc of productsSnap.docs) {
+          await deleteDoc(productDoc.ref);
+        }
+        await deleteDoc(doc(db, 'aisles', aisleId));
+      } catch (error) {
+        console.error('Error al eliminar pasillo:', error);
+      }
+    } else {
+      setAisles(prev => prev.filter(a => a.id !== aisleId));
+    }
+  };
+
+  const handleDeleteProduct = async (aisleId: string, productId: string) => {
+    if (isFirebaseConfigured) {
+      try {
+        await deleteDoc(doc(db, 'aisles', aisleId, 'products', productId));
+      } catch (error) {
+        console.error('Error al eliminar producto:', error);
+      }
+    }
+    // In demo mode, PasilloDetailView handles local state
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen w-full bg-[#DDEBEA] flex items-center justify-center font-sans">
@@ -172,13 +200,14 @@ export default function App() {
           <PanelView onNavigate={navigateToView} aisles={aisles} orders={orders} checkedOrders={checkedOrders} />
         )}
         {currentView === 'pasillos' && (
-          <AislesView onNavigate={navigateToView} aisles={aisles} onAddAisle={handleAddAisle} />
+          <AislesView onNavigate={navigateToView} aisles={aisles} onAddAisle={handleAddAisle} onDeleteAisle={handleDeleteAisle} />
         )}
         {currentView === 'pasillo-detail' && (
           <PasilloDetailView 
             onNavigate={navigateToView} 
             selectedAisleNumber={selectedAisleNumber}
             aisles={aisles}
+            onDeleteProduct={handleDeleteProduct}
           />
         )}
         {currentView === 'sugeridos' && (
