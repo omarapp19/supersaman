@@ -1,0 +1,95 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Hanken Grotesk", sans-serif;
+  --font-mono: "Geist", monospace;
+
+  --color-surface-bright: #fff8f6;
+  --color-secondary: #49654d;
+  --color-surface-container: #ffe9e4;
+  --color-on-error-container: #93000a;
+  --color-error: #ba1a1a;
+  --color-surface-container-lowest: #ffffff;
+  --color-on-secondary-fixed: #05210e;
+  --color-error-container: #ffdad6;
+  --color-primary-container: #218542;
+  --color-on-error: #ffffff;
+  --color-on-tertiary-fixed-variant: #5c4300;
+  --color-tertiary: #745815;
+  --color-on-tertiary-fixed: #261900;
+  --color-surface-container-high: #fae3de;
+  --color-surface-container-low: #fff1ed;
+  --color-tertiary-fixed: #ffdea1;
+  --color-on-primary-fixed-variant: #005322;
+  --color-surface: #DDEBEA;
+  --color-on-secondary: #ffffff;
+  --color-secondary-fixed-dim: #afceb2;
+  --color-on-secondary-container: #4f6b53;
+  --color-surface-variant: #f4ded8;
+  --color-on-primary: #ffffff;
+  --color-secondary-fixed: #caebcd;
+  --color-secondary-container: #caebcd;
+  --color-primary-fixed-dim: #7bdb8d;
+  --color-inverse-primary: #7bdb8d;
+  --color-on-secondary-fixed-variant: #314d37;
+  --color-on-tertiary: #ffffff;
+  --color-surface-dim: #ebd5d0;
+  --color-outline-variant: #becabb;
+  --color-surface-container-highest: #f4ded8;
+  --color-on-primary-container: #f7fff3;
+  --color-outline: #6f7a6e;
+  --color-on-tertiary-container: #fffbff;
+  --color-inverse-surface: #3b2d2a;
+  --color-background: #DDEBEA;
+  --color-surface-tint: #006d30;
+  --color-on-surface-variant: #3f493f;
+  --color-primary-fixed: #96f8a6;
+  --color-on-primary-fixed: #00210a;
+  --color-primary: #3E9E57;
+  --color-tertiary-container: #8f702c;
+  --color-on-surface: #281C19;
+  --color-inverse-on-surface: #ffede9;
+  --color-on-background: #281C19;
+  --color-tertiary-fixed-dim: #e8c175;
+  --color-card-surface: #F6ECDF;
+  --color-offline-banner: #FFD788;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-on-surface);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Hide scrollbar for clear aesthetic */
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.offline-banner {
+  background: repeating-linear-gradient(
+    -45deg,
+    #fae3de,
+    #fae3de 10px,
+    #fff1ed 10px,
+    #fff1ed 20px
+  );
+}
+
+.qty-active {
+  color: var(--color-primary) !important;
+  font-weight: 600;
+}
+
+@media print {
+  body { background: white !important; color: black !important; }
+  .print-hide { display: none !important; }
+  .table-container { box-shadow: none !important; border: none !important; background: transparent !important; }
+  th, td { border-bottom: 1px solid #000 !important; color: #000 !important; }
+  th { border-bottom: 2px solid #000 !important; font-weight: bold !important; }
+}
