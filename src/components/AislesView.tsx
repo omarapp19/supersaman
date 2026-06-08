@@ -1,15 +1,17 @@
 import { useState, FormEvent } from 'react';
 import { ViewState, Aisle } from '../types';
-import { ClipboardList, Wine, Coffee, Milk, Plus, X } from 'lucide-react';
+import { ClipboardList, Wine, Coffee, Milk, Plus, X, Trash2 } from 'lucide-react';
 
 interface AislesViewProps {
   onNavigate: (view: ViewState, aisleNum?: number) => void;
   aisles: Aisle[];
   onAddAisle: (newAisle: Aisle) => void;
+  onDeleteAisle: (aisleId: string) => void;
 }
 
-export function AislesView({ onNavigate, aisles, onAddAisle }: AislesViewProps) {
+export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle }: AislesViewProps) {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [aisleToDelete, setAisleToDelete] = useState<Aisle | null>(null);
   const [aisleNumber, setAisleNumber] = useState('');
   const [aisleName, setAisleName] = useState('');
 
@@ -90,12 +92,21 @@ export function AislesView({ onNavigate, aisles, onAddAisle }: AislesViewProps) 
                     <span className="font-mono text-[13px] text-on-surface-variant uppercase tracking-wider">Pasillo {aisle.number}</span>
                     <h3 className="font-sans text-[20px] md:text-[24px] text-on-surface font-semibold truncate max-w-[150px]">{aisle.name}</h3>
                   </div>
-                  {!isUnassigned && (
-                    <div className="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full font-mono text-[13px] font-medium flex items-center gap-1">
-                      <ClipboardList size={14} />
-                      <span>Asignado</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {!isUnassigned && (
+                      <div className="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full font-mono text-[13px] font-medium flex items-center gap-1">
+                        <ClipboardList size={14} />
+                        <span>Asignado</span>
+                      </div>
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setAisleToDelete(aisle); }}
+                      className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-red-100 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                      title="Eliminar pasillo"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="flex items-center gap-6 mt-6 relative z-10">
@@ -177,6 +188,38 @@ export function AislesView({ onNavigate, aisles, onAddAisle }: AislesViewProps) 
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Delete Aisle Confirmation Modal */}
+      {aisleToDelete && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setAisleToDelete(null)}>
+          <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 flex flex-col items-center text-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 size={26} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-sans text-[20px] font-bold text-on-surface">Eliminar Pasillo</h3>
+                <p className="font-sans text-[14px] text-on-surface-variant mt-1">
+                  ¿Seguro que deseas eliminar <strong>Pasillo {aisleToDelete.number} – {aisleToDelete.name}</strong>? Se borrarán todos sus productos. Esta acción no se puede deshacer.
+                </p>
+              </div>
+              <div className="flex gap-3 w-full mt-2">
+                <button
+                  onClick={() => setAisleToDelete(null)}
+                  className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => { onDeleteAisle(aisleToDelete.id); setAisleToDelete(null); }}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

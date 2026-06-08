@@ -1,7 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { ViewState, Product, Aisle } from '../types';
 import { mockProductsByAisle, mockAisles } from '../data';
-import { CloudOff, ArrowLeft, MoreVertical, Search, ScanBarcode, ArrowDownAZ, Plus, X } from 'lucide-react';
+import { CloudOff, ArrowLeft, MoreVertical, Search, ScanBarcode, ArrowDownAZ, Plus, X, Trash2 } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../firebase';
 import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
 
@@ -9,15 +9,17 @@ interface PasilloDetailViewProps {
   onNavigate: (view: ViewState, aisleNum?: number) => void;
   selectedAisleNumber: number;
   aisles: Aisle[];
+  onDeleteProduct: (aisleId: string, productId: string) => void;
 }
 
-export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles }: PasilloDetailViewProps) {
+export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onDeleteProduct }: PasilloDetailViewProps) {
   const aisle = aisles.find(a => a.number === selectedAisleNumber) || aisles[0] || mockAisles[0];
   const initialProducts = mockProductsByAisle[selectedAisleNumber] || [];
   
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
   // Product Creation States
   const [showProductModal, setShowProductModal] = useState(false);
@@ -25,6 +27,16 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles }: P
   const [productBrand, setProductBrand] = useState('');
   const [productSku, setProductSku] = useState('');
   const [productStatusSelect, setProductStatusSelect] = useState<'normal' | 'bajo' | 'crítico'>('normal');
+
+  const handleDeleteProduct = async (product: Product) => {
+    if (isFirebaseConfigured && aisle?.id) {
+      onDeleteProduct(aisle.id, product.id);
+    } else {
+      // Demo mode: update local state directly
+      setProducts(prev => prev.filter(p => p.id !== product.id));
+    }
+    setProductToDelete(null);
+  };
 
   const handleProductSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -216,7 +228,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles }: P
               ) : (
                 sortedProducts.map(product => {
                   return (
-                    <div key={product.id} className="bg-card-surface rounded-[16px] p-3 shadow-[0_4px_20px_rgba(40,28,25,0.05)] flex items-center gap-3">
+                    <div key={product.id} className="bg-card-surface rounded-[16px] p-3 shadow-[0_4px_20px_rgba(40,28,25,0.05)] flex items-center gap-3 group">
                       {/* Product Image / Avatar */}
                       <div className="w-16 h-16 rounded-[12px] bg-white border border-outline-variant/30 flex-shrink-0 overflow-hidden flex items-center justify-center">
                         {product.imageUrl ? (
@@ -231,6 +243,15 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles }: P
                         <h3 className="font-sans text-[16px] font-semibold text-[#281C19] leading-snug truncate">{product.name}</h3>
                         <span className="font-mono text-[13px] text-[#4f6b53] truncate">{product.brand} • SKU: {product.sku}</span>
                       </div>
+
+                      {/* Delete Button */}
+                      <button
+                        onClick={() => setProductToDelete(product)}
+                        className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-red-100 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Eliminar producto"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   );
                 })
@@ -317,6 +338,38 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles }: P
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Delete Product Confirmation Modal */}
+      {productToDelete && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setProductToDelete(null)}>
+          <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 flex flex-col items-center text-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 size={26} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-sans text-[20px] font-bold text-on-surface">Eliminar Producto</h3>
+                <p className="font-sans text-[14px] text-on-surface-variant mt-1">
+                  ¿Seguro que deseas eliminar <strong>{productToDelete.name}</strong>? Esta acción no se puede deshacer.
+                </p>
+              </div>
+              <div className="flex gap-3 w-full mt-2">
+                <button
+                  onClick={() => setProductToDelete(null)}
+                  className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleDeleteProduct(productToDelete)}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
