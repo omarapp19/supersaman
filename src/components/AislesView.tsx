@@ -12,12 +12,10 @@ export function AislesView({ onNavigate, aisles, onAddAisle }: AislesViewProps) 
   const [showAddModal, setShowAddModal] = useState(false);
   const [aisleNumber, setAisleNumber] = useState('');
   const [aisleName, setAisleName] = useState('');
-  const [itemsEstimated, setItemsEstimated] = useState('100');
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const num = parseInt(aisleNumber, 10);
-    const est = parseInt(itemsEstimated, 10);
 
     if (isNaN(num) || num <= 0) {
       alert("Por favor introduce un número de pasillo válido.");
@@ -35,9 +33,7 @@ export function AislesView({ onNavigate, aisles, onAddAisle }: AislesViewProps) 
       name: aisleName.trim(),
       status: 'assigned',
       progress: 0,
-      itemsEstimated: isNaN(est) ? 0 : est,
-      lastScanned: 'Sin escanear',
-      needsScan: true
+      productsCount: 0
     };
 
     onAddAisle(newAisle);
@@ -55,7 +51,6 @@ export function AislesView({ onNavigate, aisles, onAddAisle }: AislesViewProps) 
           onClick={() => {
             setAisleNumber('');
             setAisleName('');
-            setItemsEstimated('100');
             setShowAddModal(true);
           }}
           className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[15px] font-semibold transition-all shadow-md self-start sm:self-auto cursor-pointer"
@@ -111,8 +106,8 @@ export function AislesView({ onNavigate, aisles, onAddAisle }: AislesViewProps) 
                     </span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="font-mono text-[13px] text-on-surface-variant mb-1">Items Estimados</span>
-                    <span className="font-sans text-[18px] font-medium text-on-surface">{aisle.itemsEstimated.toLocaleString()}</span>
+                    <span className="font-mono text-[13px] text-on-surface-variant mb-1">Items Registrados</span>
+                    <span className="font-sans text-[18px] font-medium text-on-surface">{(aisle.productsCount || 0).toLocaleString()}</span>
                   </div>
                 </div>
 
@@ -164,18 +159,7 @@ export function AislesView({ onNavigate, aisles, onAddAisle }: AislesViewProps) 
                 />
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Items Estimados</label>
-                <input 
-                  type="number" 
-                  required
-                  min="1"
-                  value={itemsEstimated}
-                  onChange={(e) => setItemsEstimated(e.target.value)}
-                  placeholder="Ej. 300"
-                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
-                />
-              </div>
+
 
               <div className="flex gap-3 mt-4">
                 <button 

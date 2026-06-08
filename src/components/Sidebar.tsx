@@ -1,4 +1,4 @@
-import { LayoutDashboard, Store, Package2, ShoppingCart, Settings, PlusCircle, HelpCircle, LogOut } from 'lucide-react';
+import { LayoutDashboard, Store, ShoppingCart, Settings, LogOut, Sparkles } from 'lucide-react';
 import { ViewState } from '../types';
 
 interface SidebarProps {
@@ -24,20 +24,15 @@ export function Sidebar({ currentView, onNavigate, onLogout }: SidebarProps) {
           </div>
         </div>
 
-        <button className="mx-4 mb-6 flex items-center justify-center gap-2 bg-primary text-white font-mono text-[13px] rounded-full py-2.5 px-4 shadow-sm hover:opacity-90 transition-opacity">
-          <PlusCircle size={18} />
-          Escanear Artículo
-        </button>
-
         <div className="flex-1 flex flex-col gap-1 overflow-y-auto">
           <NavItem active={currentView === 'panel'} icon={LayoutDashboard} label="Panel" onClick={() => onNavigate('panel')} />
           <NavItem active={currentView === 'pasillos' || currentView === 'pasillo-detail'} icon={Store} label="Pasillos" onClick={() => onNavigate('pasillos')} />
+          <NavItem active={currentView === 'sugeridos'} icon={Sparkles} label="Sugeridos" onClick={() => onNavigate('sugeridos')} />
           <NavItem active={currentView === 'compras'} icon={ShoppingCart} label="Compras" onClick={() => onNavigate('compras')} />
           <NavItem active={currentView === 'configuracion'} icon={Settings} label="Configuración" onClick={() => onNavigate('configuracion')} />
         </div>
 
         <div className="mt-auto pt-2 border-t border-outline-variant/20 flex flex-col gap-1">
-          <NavItem active={false} icon={HelpCircle} label="Soporte" onClick={() => {}} />
           <NavItem active={false} icon={LogOut} label="Cerrar Sesión" onClick={onLogout} />
         </div>
       </div>

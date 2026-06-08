@@ -8,6 +8,7 @@ import { PasilloDetailView } from './components/PasilloDetailView';
 import { ComprasView } from './components/ComprasView';
 import { ConfiguracionView } from './components/ConfiguracionView';
 import { Login } from './components/Login';
+import { SugeridosView } from './components/SugeridosView';
 import { auth, isFirebaseConfigured, db, bootstrapFirestore } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
@@ -21,6 +22,16 @@ export default function App() {
   const [selectedAisleNumber, setSelectedAisleNumber] = useState<number>(1);
   const [aisles, setAisles] = useState<Aisle[]>(mockAisles);
   const [orders, setOrders] = useState<any[]>(mockOrders);
+  const [checkedOrders, setCheckedOrders] = useState<Set<string>>(new Set());
+
+  const toggleChecked = (id: string) => {
+    setCheckedOrders(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (isFirebaseConfigured) {
@@ -158,7 +169,7 @@ export default function App() {
       {/* Main Content Workspace */}
       <main className="md:ml-64 p-4 md:p-8 print:ml-0 print:p-0">
         {currentView === 'panel' && (
-          <PanelView onNavigate={navigateToView} aisles={aisles} orders={orders} />
+          <PanelView onNavigate={navigateToView} aisles={aisles} orders={orders} checkedOrders={checkedOrders} />
         )}
         {currentView === 'pasillos' && (
           <AislesView onNavigate={navigateToView} aisles={aisles} onAddAisle={handleAddAisle} />
@@ -167,15 +178,21 @@ export default function App() {
           <PasilloDetailView 
             onNavigate={navigateToView} 
             selectedAisleNumber={selectedAisleNumber}
+            aisles={aisles}
+          />
+        )}
+        {currentView === 'sugeridos' && (
+          <SugeridosView 
+            onNavigate={navigateToView} 
             onAddOrders={handleAddOrders}
             aisles={aisles}
           />
         )}
         {currentView === 'compras' && (
-          <ComprasView orders={orders} onNavigate={navigateToView} />
+          <ComprasView orders={orders} onNavigate={navigateToView} aisles={aisles} checkedOrders={checkedOrders} toggleChecked={toggleChecked} />
         )}
         {currentView === 'configuracion' && (
-          <ConfiguracionView />
+          <ConfiguracionView aisles={aisles} />
         )}
       </main>
 

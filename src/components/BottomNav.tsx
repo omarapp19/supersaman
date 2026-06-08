@@ -1,4 +1,4 @@
-import { LayoutGrid, ScanBarcode, Receipt, Settings } from 'lucide-react';
+import { LayoutGrid, Receipt, Settings, Sparkles } from 'lucide-react';
 import { ViewState } from '../types';
 
 interface BottomNavProps {
@@ -10,16 +10,16 @@ export function BottomNav({ currentView, onNavigate }: BottomNavProps) {
   return (
     <nav className="bg-surface/90 shadow-[0_-4px_20px_rgba(40,28,25,0.05)] backdrop-blur-xl fixed bottom-0 left-0 w-full rounded-t-3xl md:hidden z-50 flex justify-around items-center px-4 pt-2 pb-6 print-hide border-t border-white/20">
       <NavItem 
-        active={currentView === 'pasillos' || currentView === 'panel'} 
+        active={currentView === 'pasillos' || currentView === 'panel' || currentView === 'pasillo-detail'} 
         icon={LayoutGrid} 
         label="Pasillos" 
         onClick={() => onNavigate('pasillos')} 
       />
       <NavItem 
-        active={false} 
-        icon={ScanBarcode} 
-        label="Escanear" 
-        onClick={() => {}} 
+        active={currentView === 'sugeridos'} 
+        icon={Sparkles} 
+        label="Sugeridos" 
+        onClick={() => onNavigate('sugeridos')} 
       />
       <NavItem 
         active={currentView === 'compras'} 

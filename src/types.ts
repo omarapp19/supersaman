@@ -1,4 +1,4 @@
-export type ViewState = 'panel' | 'pasillos' | 'pasillo-detail' | 'compras' | 'configuracion';
+export type ViewState = 'panel' | 'pasillos' | 'pasillo-detail' | 'sugeridos' | 'compras' | 'configuracion';
 
 export interface Aisle {
   id: string;
@@ -6,9 +6,7 @@ export interface Aisle {
   name: string;
   status: 'assigned' | 'unassigned';
   progress: number;
-  itemsEstimated: number;
-  lastScanned?: string;
-  needsScan?: boolean;
+  productsCount?: number;
 }
 
 export interface Product {
@@ -16,7 +14,6 @@ export interface Product {
   name: string;
   brand: string;
   sku: string;
-  stock: number;
   status: 'normal' | 'bajo' | 'crítico';
   imageUrl?: string;
   initials?: string;
@@ -28,6 +25,7 @@ export interface OrderItem {
   brand: string;
   sku: string;
   suggestedQty: number;
+  unit: 'cajas' | 'und';
   aisle: number;
   user: string;
   status: 'normal' | 'bajo' | 'crítico';

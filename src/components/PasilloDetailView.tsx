@@ -1,24 +1,21 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { ViewState, Product, Aisle } from '../types';
 import { mockProductsByAisle, mockAisles } from '../data';
-import { CloudOff, ArrowLeft, MoreVertical, Search, ScanBarcode, ArrowDownAZ, Minus, Plus, Send, AlertTriangle } from 'lucide-react';
+import { CloudOff, ArrowLeft, MoreVertical, Search, ScanBarcode, ArrowDownAZ, Plus, X } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../firebase';
-import { collection, doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
-import { X } from 'lucide-react';
+import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 interface PasilloDetailViewProps {
   onNavigate: (view: ViewState, aisleNum?: number) => void;
   selectedAisleNumber: number;
-  onAddOrders: (newOrders: any[]) => void;
   aisles: Aisle[];
 }
 
-export function PasilloDetailView({ onNavigate, selectedAisleNumber, onAddOrders, aisles }: PasilloDetailViewProps) {
+export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles }: PasilloDetailViewProps) {
   const aisle = aisles.find(a => a.number === selectedAisleNumber) || aisles[0] || mockAisles[0];
   const initialProducts = mockProductsByAisle[selectedAisleNumber] || [];
   
   const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
 
@@ -27,12 +24,10 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, onAddOrders
   const [productName, setProductName] = useState('');
   const [productBrand, setProductBrand] = useState('');
   const [productSku, setProductSku] = useState('');
-  const [productStock, setProductStock] = useState('10');
   const [productStatusSelect, setProductStatusSelect] = useState<'normal' | 'bajo' | 'crítico'>('normal');
 
   const handleProductSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const stockVal = parseInt(productStock, 10);
     const initials = productName.trim().substring(0, 2).toUpperCase();
 
     const newProduct: Product = {
@@ -40,7 +35,6 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, onAddOrders
       name: productName.trim(),
       brand: productBrand.trim(),
       sku: productSku.trim(),
-      stock: isNaN(stockVal) ? 0 : stockVal,
       status: productStatusSelect,
       initials: initials
     };
@@ -54,14 +48,15 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, onAddOrders
       }
     } else {
       setProducts(prev => [...prev, newProduct].sort((a, b) => a.name.localeCompare(b.name)));
-      setQuantities(prev => ({ ...prev, [newProduct.id]: newProduct.stock < 10 ? 10 - newProduct.stock : 0 }));
     }
 
     setShowProductModal(false);
   };
 
   useEffect(() => {
-    if (isFirebaseConfigured && aisle?.id) {
+    if (!aisle?.id) return;
+
+    if (isFirebaseConfigured) {
       const productsRef = collection(db, 'aisles', aisle.id, 'products');
       const unsubscribe = onSnapshot(productsRef, (snapshot) => {
         const productsData: Product[] = [];
@@ -72,17 +67,16 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, onAddOrders
         // Default sort by name to keep them stable
         productsData.sort((a, b) => a.name.localeCompare(b.name));
         setProducts(productsData);
-        
-        // Initialize quantities only for new products
-        setQuantities(prev => {
-          const next = { ...prev };
-          productsData.forEach(p => {
-            if (next[p.id] === undefined) {
-              next[p.id] = p.stock < 10 ? 10 - p.stock : 0;
-            }
+
+        // Update parent aisle count in Firestore if different
+        if (aisle.productsCount !== productsData.length) {
+          // Import dynamic updateDoc inside if needed or use local mock count
+          import('firebase/firestore').then(({ updateDoc }) => {
+            updateDoc(doc(db, 'aisles', aisle.id), { productsCount: productsData.length }).catch(err => {
+              console.error("Error al actualizar productsCount del pasillo:", err);
+            });
           });
-          return next;
-        });
+        }
       }, (error) => {
         console.error("Error al escuchar productos de Firestore:", error);
       });
@@ -90,9 +84,6 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, onAddOrders
     } else {
       const freshProducts = mockProductsByAisle[selectedAisleNumber] || [];
       setProducts(freshProducts);
-      setQuantities(
-        freshProducts.reduce((acc, p) => ({ ...acc, [p.id]: p.stock < 10 ? 10 - p.stock : 0 }), {})
-      );
     }
   }, [selectedAisleNumber, aisle?.id]);
 
@@ -101,78 +92,39 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, onAddOrders
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
-  const updateQty = (id: string, delta: number) => {
-    setQuantities(prev => ({
-      ...prev,
-      [id]: Math.max(0, (prev[id] || 0) + delta)
-    }));
-  };
+  const filteredProducts = products.filter(product => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      product.name.toLowerCase().includes(query) ||
+      product.brand.toLowerCase().includes(query) ||
+      product.sku.toLowerCase().includes(query)
+    );
+  });
 
-  const updateProductStatus = async (id: string, status: 'normal' | 'bajo' | 'crítico') => {
-    setProducts(prev => prev.map(p => p.id === id ? { ...p, status } : p));
-    if (isFirebaseConfigured && aisle?.id) {
-      try {
-        const productRef = doc(db, 'aisles', aisle.id, 'products', id);
-        await updateDoc(productRef, { status });
-      } catch (error) {
-        console.error("Error al actualizar estado del producto:", error);
-      }
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    if (sortOrder === 'asc') {
+      return a.name.localeCompare(b.name);
+    } else if (sortOrder === 'desc') {
+      return b.name.localeCompare(a.name);
     }
-  };
-
-  const submitWeeklySuggested = () => {
-    const ordersToSubmit = products
-      .filter(p => (quantities[p.id] || 0) > 0)
-      .map(p => ({
-        id: 'o_' + Date.now() + '_' + p.id,
-        productName: p.name,
-        brand: p.brand,
-        sku: p.sku,
-        suggestedQty: quantities[p.id],
-        aisle: aisle.number,
-        user: 'Admin Principal',
-        status: p.status,
-        lastUpdated: 'Justo ahora'
-      }));
-
-    if (ordersToSubmit.length > 0) {
-      onAddOrders(ordersToSubmit);
-      onNavigate('compras');
-    } else {
-      alert("Por favor, incrementa la cantidad sugerida de al menos un artículo para poder enviar el sugerido.");
-    }
-  };
-
-  const pendingCount = products.filter(p => p.status === 'crítico' || p.status === 'bajo').length;
+    return 0;
+  });
 
   return (
-    <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-right-4 duration-500 pb-24 md:pb-8">
-      {/* Offline Banner matching requested style */}
+    <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-right-4 duration-500 pb-12">
       {isOffline && (
         <div className="offline-banner w-full py-1.5 flex justify-center items-center gap-2 shadow-sm rounded-lg mb-4 animate-in fade-in slide-in-from-top-2">
           <CloudOff size={14} className="text-[#745815]" />
           <span className="font-mono text-[13px] font-medium text-[#745815]">Modo offline activo</span>
-        </div>
-      )}
-
-      {/* Suggested warning banner */}
-      {pendingCount > 0 && (
-        <div className="bg-amber-100 border border-amber-300 text-amber-800 w-full py-3.5 px-5 flex items-start sm:items-center gap-3 rounded-2xl mb-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
-          <AlertTriangle size={20} className="text-amber-600 flex-shrink-0 mt-0.5 sm:mt-0 animate-pulse" />
-          <div className="flex-1">
-            <span className="font-sans text-[15px] font-bold block leading-tight">Sugeridos de Compra Pendientes</span>
-            <span className="font-sans text-[13px] opacity-95 block mt-0.5">Saman AI detectó {pendingCount} artículos con stock bajo o crítico que requieren atención en el {aisle.name}.</span>
-          </div>
         </div>
       )}
 
@@ -181,7 +133,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, onAddOrders
         <button onClick={() => onNavigate('pasillos')} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant transition-colors">
           <ArrowLeft size={24} />
         </button>
-        <h1 className="font-sans text-[20px] font-semibold text-on-surface">Sugerido Semanal</h1>
+        <h1 className="font-sans text-[20px] font-semibold text-on-surface">Detalle de Pasillo</h1>
         <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant transition-colors">
           <MoreVertical size={24} />
         </button>
@@ -212,7 +164,6 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, onAddOrders
               setProductName('');
               setProductBrand('');
               setProductSku('');
-              setProductStock('10');
               setProductStatusSelect('normal');
               setShowProductModal(true);
             }}
@@ -245,25 +196,6 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, onAddOrders
       {/* List */}
       <div className="flex flex-col gap-3 max-w-4xl mx-auto w-full">
         {(() => {
-          const filteredProducts = products.filter(product => {
-            const query = searchQuery.trim().toLowerCase();
-            if (!query) return true;
-            return (
-              product.name.toLowerCase().includes(query) ||
-              product.brand.toLowerCase().includes(query) ||
-              product.sku.toLowerCase().includes(query)
-            );
-          });
-
-          const sortedProducts = [...filteredProducts].sort((a, b) => {
-            if (sortOrder === 'asc') {
-              return a.name.localeCompare(b.name);
-            } else if (sortOrder === 'desc') {
-              return b.name.localeCompare(a.name);
-            }
-            return 0;
-          });
-
           return (
             <>
               <div className="flex items-center justify-between py-1 px-2">
@@ -272,6 +204,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, onAddOrders
                   {sortedProducts.length} {sortedProducts.length === 1 ? 'ítem' : 'ítems'}
                 </span>
               </div>
+
               {sortedProducts.length === 0 ? (
                 <div className="bg-card-surface rounded-[32px] p-12 text-center border border-outline-variant/30 flex flex-col items-center justify-center max-w-xl mx-auto shadow-sm mt-8 animate-in fade-in duration-300 w-full">
                   <div className="bg-primary/10 text-primary p-4 rounded-full mb-4">
@@ -282,7 +215,6 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, onAddOrders
                 </div>
               ) : (
                 sortedProducts.map(product => {
-                  const qty = quantities[product.id] || 0;
                   return (
                     <div key={product.id} className="bg-card-surface rounded-[16px] p-3 shadow-[0_4px_20px_rgba(40,28,25,0.05)] flex items-center gap-3">
                       {/* Product Image / Avatar */}
@@ -298,67 +230,6 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, onAddOrders
                       <div className="flex-grow flex flex-col justify-center overflow-hidden pr-2">
                         <h3 className="font-sans text-[16px] font-semibold text-[#281C19] leading-snug truncate">{product.name}</h3>
                         <span className="font-mono text-[13px] text-[#4f6b53] truncate">{product.brand} • SKU: {product.sku}</span>
-                        <span className="font-mono text-[11px] text-on-surface-variant mt-1">Stock: {product.stock}</span>
-                        
-                        <div className="flex gap-1.5 mt-2 overflow-x-auto no-scrollbar">
-                          <button 
-                            onClick={() => updateProductStatus(product.id, 'normal')}
-                            className={`px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all ${
-                              product.status === 'normal' 
-                                ? 'border-primary bg-primary/10 text-primary font-bold' 
-                                : 'border-outline-variant/30 text-on-surface-variant/70 hover:bg-surface-variant/50'
-                            }`}
-                          >
-                            Normal
-                          </button>
-                          <button 
-                            onClick={() => updateProductStatus(product.id, 'bajo')}
-                            className={`px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all ${
-                              product.status === 'bajo' 
-                                ? 'border-amber-500 bg-amber-500/10 text-amber-700 font-bold' 
-                                : 'border-outline-variant/30 text-on-surface-variant/70 hover:bg-surface-variant/50'
-                            }`}
-                          >
-                            Bajo
-                          </button>
-                          <button 
-                            onClick={() => updateProductStatus(product.id, 'crítico')}
-                            className={`px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all ${
-                              product.status === 'crítico' 
-                                ? 'border-error bg-error/10 text-error font-bold' 
-                                : 'border-outline-variant/30 text-on-surface-variant/70 hover:bg-surface-variant/50'
-                            }`}
-                          >
-                            Crítico
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Stepper */}
-                      <div className="flex items-center gap-1 bg-white rounded-full p-1 shadow-sm border border-outline-variant/30">
-                        <button 
-                          onClick={() => updateQty(product.id, -1)}
-                          disabled={qty === 0}
-                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${qty === 0 ? 'text-outline-variant/50' : 'text-on-surface-variant hover:bg-surface-variant'}`}
-                        >
-                          <Minus size={18} strokeWidth={2.5} />
-                        </button>
-                        <input 
-                          type="number"
-                          value={qty}
-                          min={0}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value, 10);
-                            setQuantities(prev => ({ ...prev, [product.id]: isNaN(val) ? 0 : Math.max(0, val) }));
-                          }}
-                          className={`font-sans text-[16px] w-12 text-center bg-transparent focus:outline-none focus:ring-0 border-none select-all font-semibold tabular-nums ${qty > 0 ? 'text-primary' : 'text-on-surface-variant'}`}
-                        />
-                        <button 
-                          onClick={() => updateQty(product.id, 1)}
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
-                        >
-                          <Plus size={18} strokeWidth={2.5} />
-                        </button>
                       </div>
                     </div>
                   );
@@ -369,16 +240,6 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, onAddOrders
         })()}
       </div>
 
-      {/* FAB */}
-      <div className="fixed bottom-[80px] md:bottom-6 left-0 md:left-64 xl:left-auto xl:w-[800px] w-full px-4 pt-8 pb-4 bg-gradient-to-t from-[var(--color-background)] via-[var(--color-background)] to-transparent pointer-events-none z-40">
-        <button 
-          onClick={submitWeeklySuggested}
-          className="w-full bg-primary text-white rounded-full py-4 shadow-[0_8px_30px_rgba(62,158,87,0.3)] flex items-center justify-center gap-2 hover:scale-[0.98] transition-transform pointer-events-auto"
-        >
-          <Send size={20} />
-          <span className="font-sans text-[16px] font-semibold">Enviar Sugerido Semanal</span>
-        </button>
-      </div>
       {/* Product Creation Modal */}
       {showProductModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowProductModal(false)}>
@@ -427,31 +288,17 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, onAddOrders
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Stock Físico</label>
-                  <input 
-                    type="number" 
-                    required
-                    min="0"
-                    value={productStock}
-                    onChange={(e) => setProductStock(e.target.value)}
-                    placeholder="Ej. 10"
-                    className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Estado Inicial</label>
-                  <select 
-                    value={productStatusSelect}
-                    onChange={(e) => setProductStatusSelect(e.target.value as any)}
-                    className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3.5 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
-                  >
-                    <option value="normal">Normal</option>
-                    <option value="bajo">Bajo</option>
-                    <option value="crítico">Crítico</option>
-                  </select>
-                </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Estado Inicial</label>
+                <select 
+                  value={productStatusSelect}
+                  onChange={(e) => setProductStatusSelect(e.target.value as any)}
+                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3.5 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+                >
+                  <option value="normal">Normal</option>
+                  <option value="bajo">Bajo</option>
+                  <option value="crítico">Crítico</option>
+                </select>
               </div>
 
               <div className="flex gap-3 mt-4">
