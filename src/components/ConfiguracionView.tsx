@@ -124,7 +124,17 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
           // En Firestore usamos el username como ID del documento
           const userRef = doc(db, 'users', usernameKey);
           // Primero crear en Firebase Authentication
-          await createFirebaseUser(usernameKey, userPassword.trim());
+          try {
+            await createFirebaseUser(usernameKey, userPassword.trim());
+          } catch (authError: any) {
+            // Si el correo ya está en uso, pero el documento de Firestore no existe (ej. fue eliminado),
+            // permitimos volver a crearlo en la base de datos sin lanzar error de autenticación.
+            if (authError.code === 'auth/email-already-in-use') {
+              console.warn("El usuario ya existe en Firebase Auth. Restaurando documento en Firestore.");
+            } else {
+              throw authError;
+            }
+          }
           // Luego guardar el perfil en Firestore
           await setDoc(userRef, profile);
         }
@@ -574,8 +584,13 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
               <div>
                 <h3 className="font-sans text-[20px] font-bold text-on-surface">Eliminar Usuario</h3>
                 <p className="font-sans text-[14px] text-on-surface-variant mt-1">
-                  ¿Estás seguro de que deseas eliminar al usuario <strong>@{userToDelete.username}</strong>? Esta acción no se puede deshacer.
+                  ¿Estás seguro de que deseas eliminar al usuario <strong>@{userToDelete.username}</strong> de la base de datos de perfiles?
                 </p>
+                {isFirebaseConfigured && (
+                  <p className="font-sans text-[12px] text-left text-amber-700 bg-amber-500/10 p-3 rounded-2xl border border-amber-500/20 mt-3">
+                    <strong>Nota de Seguridad:</strong> Esto remueve el perfil de Firestore, pero su acceso en <strong>Firebase Auth</strong> permanecerá activo. Para eliminar sus credenciales de forma permanente, debes borrar el usuario en la Consola de Firebase (pestaña Authentication).
+                  </p>
+                )}
               </div>
               <div className="flex gap-3 w-full mt-2">
                 <button
