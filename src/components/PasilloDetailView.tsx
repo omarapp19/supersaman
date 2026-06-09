@@ -4,16 +4,35 @@ import { mockProductsByAisle, mockAisles } from '../data';
 import { CloudOff, ArrowLeft, MoreVertical, Search, ScanBarcode, ArrowDownAZ, Plus, X, Trash2 } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../firebase';
 import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { BarcodeScanner } from './BarcodeScanner';
+import { useToast } from './Toast';
 
 interface PasilloDetailViewProps {
   onNavigate: (view: ViewState, aisleNum?: number) => void;
   selectedAisleNumber: number;
   aisles: Aisle[];
   onDeleteProduct: (aisleId: string, productId: string) => void;
+  user?: any;
 }
 
-export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onDeleteProduct }: PasilloDetailViewProps) {
+export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onDeleteProduct, user }: PasilloDetailViewProps) {
+  const toast = useToast();
   const aisle = aisles.find(a => a.number === selectedAisleNumber) || aisles[0] || mockAisles[0];
+  
+  // Safety check: if operator is assigned to specific aisles, deny access if numbers mismatch
+  if (user?.role === 'operador' && user.assignedAisles !== undefined && Array.isArray(user.assignedAisles) && user.assignedAisles.length > 0) {
+    if (!user.assignedAisles.includes(aisle.number)) {
+      return (
+        <div className="w-full text-center py-12 bg-card-surface rounded-3xl border border-error/20 p-6 max-w-md mx-auto mt-12 shadow-sm">
+          <h3 className="font-sans text-[20px] font-bold text-error mb-2">Acceso Denegado</h3>
+          <p className="font-sans text-[15px] text-on-surface-variant mb-6">No tienes permisos para visualizar o gestionar este pasillo.</p>
+          <button onClick={() => onNavigate('pasillos')} className="px-6 py-2.5 bg-primary text-white rounded-full font-sans text-[14px] font-semibold">
+            Volver a Pasillos
+          </button>
+        </div>
+      );
+    }
+  }
   const initialProducts = mockProductsByAisle[selectedAisleNumber] || [];
   
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -23,10 +42,22 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
 
   // Product Creation States
   const [showProductModal, setShowProductModal] = useState(false);
+  const [savingProduct, setSavingProduct] = useState(false);
   const [productName, setProductName] = useState('');
   const [productBrand, setProductBrand] = useState('');
   const [productSku, setProductSku] = useState('');
   const [productStatusSelect, setProductStatusSelect] = useState<'normal' | 'bajo' | 'crítico'>('normal');
+  const [showScanner, setShowScanner] = useState(false);
+
+  const handleScanResult = (code: string) => {
+    setShowScanner(false);
+    // Pre-fill SKU and open product modal
+    setProductName('');
+    setProductBrand('');
+    setProductSku(code);
+    setProductStatusSelect('normal');
+    setShowProductModal(true);
+  };
 
   const handleDeleteProduct = async (product: Product) => {
     if (isFirebaseConfigured && aisle?.id) {
@@ -40,6 +71,9 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
 
   const handleProductSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (savingProduct) return; // Evita doble submit
+    setSavingProduct(true);
+
     const initials = productName.trim().substring(0, 2).toUpperCase();
 
     const newProduct: Product = {
@@ -51,18 +85,33 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
       initials: initials
     };
 
-    if (isFirebaseConfigured && aisle?.id) {
-      try {
+    try {
+      if (isFirebaseConfigured && aisle?.id) {
         const productRef = doc(db, 'aisles', aisle.id, 'products', newProduct.id);
         await setDoc(productRef, newProduct);
-      } catch (error) {
-        console.error("Error al guardar producto en Firestore:", error);
+      } else {
+        setProducts(prev => [...prev, newProduct].sort((a, b) => a.name.localeCompare(b.name)));
       }
-    } else {
-      setProducts(prev => [...prev, newProduct].sort((a, b) => a.name.localeCompare(b.name)));
-    }
+      
+      // Trigger Push Notification if stock is critical and setting is active
+      if (newProduct.status === 'crítico') {
+        const isPushEnabled = localStorage.getItem('saman_push_alerts') !== 'false';
+        if (isPushEnabled && 'Notification' in window && Notification.permission === 'granted') {
+          new Notification('Stock Crítico Registrado', {
+            body: `El producto "${newProduct.name}" (${newProduct.brand}) se ha registrado en estado crítico en el Pasillo ${aisle.number}.`,
+            icon: '/logo.svg'
+          });
+        }
+      }
 
-    setShowProductModal(false);
+      toast.success('Producto agregado con éxito.');
+      setShowProductModal(false);
+    } catch (error) {
+      console.error("Error al guardar producto en Firestore:", error);
+      toast.error('Error al guardar el producto. Intenta de nuevo.');
+    } finally {
+      setSavingProduct(false);
+    }
   };
 
   useEffect(() => {
@@ -81,11 +130,13 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
         setProducts(productsData);
 
         // Update parent aisle count in Firestore if different
-        if (aisle.productsCount !== productsData.length) {
+        if (aisle.productsCount !== productsData.length && aisles.some(a => a.id === aisle.id)) {
           // Import dynamic updateDoc inside if needed or use local mock count
           import('firebase/firestore').then(({ updateDoc }) => {
             updateDoc(doc(db, 'aisles', aisle.id), { productsCount: productsData.length }).catch(err => {
-              console.error("Error al actualizar productsCount del pasillo:", err);
+              if (err.code !== 'not-found' && !err.message?.includes('No document to update')) {
+                console.error("Error al actualizar productsCount del pasillo:", err);
+              }
             });
           });
         }
@@ -163,9 +214,13 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full bg-white border border-outline-variant/50 rounded-full py-3 pl-12 pr-12 font-sans text-[16px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
         />
-        <button className="absolute inset-y-0 right-0 pr-4 flex items-center text-primary">
-          <ScanBarcode size={24} />
-        </button>
+        <button
+            onClick={() => setShowScanner(true)}
+            className="absolute inset-y-0 right-0 pr-4 flex items-center text-primary hover:text-primary/70 transition-colors"
+            title="Escanear código de barra"
+          >
+            <ScanBarcode size={24} />
+          </button>
       </div>
 
       <div className="flex items-center justify-between px-2 mb-6">
@@ -240,7 +295,18 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
 
                       {/* Product Info */}
                       <div className="flex-grow flex flex-col justify-center overflow-hidden pr-2">
-                        <h3 className="font-sans text-[16px] font-semibold text-[#281C19] leading-snug truncate">{product.name}</h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-sans text-[16px] font-semibold text-[#281C19] leading-snug truncate">{product.name}</h3>
+                          {product.status === 'normal' && (
+                            <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-full font-mono text-[10px] font-bold uppercase">Normal</span>
+                          )}
+                          {product.status === 'bajo' && (
+                            <span className="px-2 py-0.5 bg-amber-500/10 text-amber-700 border border-amber-500/20 rounded-full font-mono text-[10px] font-bold uppercase">Bajo</span>
+                          )}
+                          {product.status === 'crítico' && (
+                            <span className="px-2 py-0.5 bg-rose-500/10 text-rose-700 border border-rose-500/20 rounded-full font-mono text-[10px] font-bold uppercase animate-pulse">Crítico</span>
+                          )}
+                        </div>
                         <span className="font-mono text-[13px] text-[#4f6b53] truncate">{product.brand} • SKU: {product.sku}</span>
                       </div>
 
@@ -278,6 +344,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                 <input 
                   type="text" 
                   required
+                  autoFocus
                   value={productName}
                   onChange={(e) => setProductName(e.target.value)}
                   placeholder="Ej. Leche Semidescremada 1L"
@@ -330,11 +397,17 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                 >
                   Cancelar
                 </button>
-                <button 
+                <button
                   type="submit"
-                  className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all"
+                  disabled={savingProduct}
+                  className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all disabled:opacity-60 flex items-center justify-center gap-2"
                 >
-                  Guardar Producto
+                  {savingProduct ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Guardando...
+                    </>
+                  ) : 'Guardar Producto'}
                 </button>
               </div>
             </form>
@@ -372,6 +445,13 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
             </div>
           </div>
         </div>
+      )}
+      {/* Barcode Scanner */}
+      {showScanner && (
+        <BarcodeScanner
+          onScan={handleScanResult}
+          onClose={() => setShowScanner(false)}
+        />
       )}
     </div>
   );

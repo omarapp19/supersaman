@@ -4,14 +4,17 @@ import { mockProductsByAisle, mockAisles } from '../data';
 import { CloudOff, ArrowLeft, Search, ScanBarcode, ArrowDownAZ, Minus, Plus, Send, AlertTriangle, Lightbulb } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../firebase';
 import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { useToast } from './Toast';
 
 interface SugeridosViewProps {
   onNavigate: (view: ViewState, aisleNum?: number) => void;
   onAddOrders: (newOrders: any[]) => void;
   aisles: Aisle[];
+  user?: any;
 }
 
-export function SugeridosView({ onNavigate, onAddOrders, aisles }: SugeridosViewProps) {
+export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: SugeridosViewProps) {
+  const toast = useToast();
   const [selectedAisle, setSelectedAisle] = useState<Aisle | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -19,6 +22,21 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles }: SugeridosView
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  const isOperator = user?.role === 'operador';
+  const displayedAisles = isOperator
+    ? aisles.filter(a => user?.assignedAisles?.includes(a.number))
+    : aisles;
+
+  // Auto-select operator's assigned aisle on mount (only if they have exactly one aisle assigned)
+  useEffect(() => {
+    if (isOperator && user?.assignedAisles && user.assignedAisles.length === 1) {
+      const myAisle = aisles.find(a => a.number === user.assignedAisles[0]);
+      if (myAisle) {
+        setSelectedAisle(myAisle);
+      }
+    }
+  }, [user, aisles]);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -50,9 +68,11 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles }: SugeridosView
         setProducts(productsData);
 
         // Update parent aisle count if different
-        if (selectedAisle.productsCount !== productsData.length) {
+        if (selectedAisle.productsCount !== productsData.length && aisles.some(a => a.id === selectedAisle.id)) {
           updateDoc(doc(db, 'aisles', selectedAisle.id), { productsCount: productsData.length }).catch(err => {
-            console.error("Error al actualizar productsCount del pasillo:", err);
+            if (err.code !== 'not-found' && !err.message?.includes('No document to update')) {
+              console.error("Error al actualizar productsCount del pasillo:", err);
+            }
           });
         }
         
@@ -107,6 +127,18 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles }: SugeridosView
 
   const updateProductStatus = async (id: string, status: 'normal' | 'bajo' | 'crítico') => {
     setProducts(prev => prev.map(p => p.id === id ? { ...p, status } : p));
+    const prod = products.find(p => p.id === id);
+
+    if (status === 'crítico' && prod) {
+      const isPushEnabled = localStorage.getItem('saman_push_alerts') !== 'false';
+      if (isPushEnabled && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('Stock Crítico Detectado', {
+          body: `El producto "${prod.name}" (${prod.brand}) se encuentra en estado crítico en el Pasillo ${selectedAisle?.number || ''}.`,
+          icon: '/logo.svg'
+        });
+      }
+    }
+
     if (isFirebaseConfigured && selectedAisle?.id) {
       try {
         const productRef = doc(db, 'aisles', selectedAisle.id, 'products', id);
@@ -130,7 +162,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles }: SugeridosView
         suggestedQty: quantities[p.id],
         unit: units[p.id] || 'und',
         aisle: selectedAisle.number,
-        user: 'Admin Principal',
+        user: user?.displayName || user?.fullName || 'Operador',
         status: p.status,
         lastUpdated: now
       }));
@@ -145,11 +177,11 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles }: SugeridosView
         });
         return next;
       });
-      alert("¡Sugerido semanal enviado con éxito!");
+      toast.success("¡Sugerido semanal enviado con éxito!");
       // Return to aisle selector screen
       setSelectedAisle(null);
     } else {
-      alert("Por favor, incrementa la cantidad sugerida de al menos un artículo para poder enviar el sugerido.");
+      toast.error("Por favor, incrementa la cantidad sugerida de al menos un artículo para poder enviar el sugerido.");
     }
   };
 
@@ -188,17 +220,23 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles }: SugeridosView
           <p className="font-sans text-[16px] md:text-[18px] text-on-surface-variant mt-2">Selecciona un pasillo para detallar el estado y colocar las sugerencias de compra.</p>
         </header>
 
-        {aisles.length === 0 ? (
+        {displayedAisles.length === 0 ? (
           <div className="bg-card-surface rounded-[32px] p-12 text-center border border-outline-variant/30 flex flex-col items-center justify-center max-w-xl mx-auto shadow-sm mt-8">
             <div className="bg-primary/10 text-primary p-4 rounded-full mb-4">
               <Lightbulb size={36} />
             </div>
-            <h3 className="font-sans text-[20px] font-bold text-on-surface mb-2">No hay pasillos creados</h3>
-            <p className="font-sans text-[15px] text-on-surface-variant max-w-md">Para poder generar sugeridos de compra, debes crear al menos un pasillo primero en la sección de Pasillos.</p>
+            <h3 className="font-sans text-[20px] font-bold text-on-surface mb-2">
+              {isOperator ? 'No tienes un pasillo asignado' : 'No hay pasillos creados'}
+            </h3>
+            <p className="font-sans text-[15px] text-on-surface-variant max-w-md">
+              {isOperator 
+                ? 'Para poder generar sugeridos de compra, solicita al administrador que te asigne un pasillo.'
+                : 'Para poder generar sugeridos de compra, debes crear al menos un pasillo primero en la sección de Pasillos.'}
+            </p>
           </div>
         ) : (
           <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-6">
-            {aisles.map((a) => {
+            {displayedAisles.map((a) => {
               return (
                 <button
                   key={a.id}
@@ -357,7 +395,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles }: SugeridosView
                         onClick={() => updateProductStatus(product.id, 'crítico')}
                         className={`px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider cursor-pointer transition-all ${
                           product.status === 'crítico' 
-                            ? 'border-error bg-error/10 text-error font-bold' 
+                            ? 'border-error bg-error/10 text-error font-bold animate-pulse' 
                             : 'border-outline-variant/30 text-on-surface-variant/70 hover:bg-surface-variant/50'
                         }`}
                       >
@@ -430,10 +468,10 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles }: SugeridosView
 
       {/* FAB */}
       {products.length > 0 && (
-        <div className="fixed bottom-[80px] md:bottom-6 left-0 md:left-64 xl:left-auto xl:w-[800px] w-full px-4 pt-8 pb-4 bg-gradient-to-t from-[var(--color-background)] via-[var(--color-background)] to-transparent pointer-events-none z-40">
+        <div className="fixed bottom-[80px] md:bottom-6 left-0 md:left-64 right-0 px-4 pt-8 pb-4 bg-gradient-to-t from-[var(--color-background)] via-[var(--color-background)] to-transparent pointer-events-none z-40 flex justify-center">
           <button 
             onClick={submitWeeklySuggested}
-            className="w-full bg-primary text-white rounded-full py-4 shadow-[0_8px_30px_rgba(62,158,87,0.3)] flex items-center justify-center gap-2 hover:scale-[0.98] transition-transform pointer-events-auto cursor-pointer"
+            className="w-full max-w-xl bg-primary text-white rounded-full py-4 shadow-[0_8px_30px_rgba(62,158,87,0.3)] flex items-center justify-center gap-2 hover:scale-[0.98] transition-transform pointer-events-auto cursor-pointer"
           >
             <Send size={20} />
             <span className="font-sans text-[16px] font-semibold">Enviar Sugerido Semanal</span>

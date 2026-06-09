@@ -7,25 +7,35 @@ interface AislesViewProps {
   aisles: Aisle[];
   onAddAisle: (newAisle: Aisle) => void;
   onDeleteAisle: (aisleId: string) => void;
+  user?: any;
+  users?: any[];
 }
 
-export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle }: AislesViewProps) {
+export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle, user, users = [] }: AislesViewProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [aisleToDelete, setAisleToDelete] = useState<Aisle | null>(null);
   const [aisleNumber, setAisleNumber] = useState('');
   const [aisleName, setAisleName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const isOperator = user?.role === 'operador';
+  
+  const displayedAisles = isOperator
+    ? aisles.filter(a => user?.assignedAisles?.includes(a.number))
+    : aisles;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    setError(null);
     const num = parseInt(aisleNumber, 10);
 
     if (isNaN(num) || num <= 0) {
-      alert("Por favor introduce un número de pasillo válido.");
+      setError("Por favor introduce un número de pasillo válido.");
       return;
     }
 
     if (aisles.some(a => a.number === num)) {
-      alert(`El pasillo número ${num} ya existe.`);
+      setError(`El pasillo número ${num} ya existe.`);
       return;
     }
 
@@ -49,41 +59,57 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle }: Ai
           <h2 className="font-sans text-[24px] md:text-[32px] text-on-surface font-bold">Seleccionar Pasillo</h2>
           <p className="font-sans text-[16px] md:text-[18px] text-on-surface-variant">Elige un pasillo para comenzar el inventario o crea uno nuevo.</p>
         </div>
-        <button 
-          onClick={() => {
-            setAisleNumber('');
-            setAisleName('');
-            setShowAddModal(true);
-          }}
-          className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[15px] font-semibold transition-all shadow-md self-start sm:self-auto cursor-pointer"
-        >
-          <Plus size={18} />
-          Nuevo Pasillo
-        </button>
+        {!isOperator && (
+          <button 
+            onClick={() => {
+              setAisleNumber('');
+              setAisleName('');
+              setError(null);
+              setShowAddModal(true);
+            }}
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[15px] font-semibold transition-all shadow-md self-start sm:self-auto cursor-pointer"
+          >
+            <Plus size={18} />
+            Nuevo Pasillo
+          </button>
+        )}
       </section>
 
-      {aisles.length === 0 ? (
+      {displayedAisles.length === 0 ? (
         <div className="bg-card-surface rounded-[32px] p-12 text-center border border-outline-variant/30 flex flex-col items-center justify-center max-w-xl mx-auto shadow-sm mt-8 animate-in fade-in duration-300">
           <div className="bg-primary/10 text-primary p-4 rounded-full mb-4">
             <ClipboardList size={36} />
           </div>
-          <h3 className="font-sans text-[20px] font-bold text-on-surface mb-2">No hay pasillos registrados</h3>
-          <p className="font-sans text-[15px] text-on-surface-variant max-w-md mb-6">Comienza agregando tu primer pasillo usando el botón de arriba.</p>
+          <h3 className="font-sans text-[20px] font-bold text-on-surface mb-2">
+            {isOperator ? 'No tienes un pasillo asignado' : 'No hay pasillos registrados'}
+          </h3>
+          <p className="font-sans text-[15px] text-on-surface-variant max-w-md mb-6">
+            {isOperator 
+              ? 'Por favor, solicita al administrador que te asigne un pasillo en la configuración.' 
+              : 'Comienza agregando tu primer pasillo usando el botón de arriba.'}
+          </p>
         </div>
       ) : (
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-6">
-          {aisles.map((aisle) => {
+          {displayedAisles.map((aisle) => {
             let Icon = Milk;
             if (aisle.name.includes("Bebidas") || aisle.name.includes("Licores")) Icon = Wine;
             if (aisle.name.includes("Desayuno") || aisle.name.includes("Café")) Icon = Coffee;
 
             const isUnassigned = aisle.status === 'unassigned';
 
+            // Find operators assigned to this aisle
+            const assignedOperators = users.filter(u => 
+              u.role === 'operador' && 
+              u.assignedAisles && 
+              u.assignedAisles.includes(aisle.number)
+            );
+
             return (
-              <button 
+              <div 
                 key={aisle.id}
                 onClick={() => onNavigate('pasillo-detail', aisle.number)}
-                className={`text-left rounded-3xl p-6 transition-transform hover:scale-[0.98] shadow-[0_4px_20px_rgba(40,28,25,0.05)] relative overflow-hidden group ${
+                className={`text-left rounded-3xl p-6 transition-transform hover:scale-[0.98] shadow-[0_4px_20px_rgba(40,28,25,0.05)] relative overflow-hidden group cursor-pointer ${
                   isUnassigned ? 'bg-white opacity-80 border border-outline-variant/30' : 'bg-card-surface'
                 }`}
               >
@@ -93,19 +119,21 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle }: Ai
                     <h3 className="font-sans text-[20px] md:text-[24px] text-on-surface font-semibold truncate max-w-[150px]">{aisle.name}</h3>
                   </div>
                   <div className="flex items-center gap-2">
-                    {!isUnassigned && (
-                      <div className="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full font-mono text-[13px] font-medium flex items-center gap-1">
-                        <ClipboardList size={14} />
-                        <span>Asignado</span>
+                    {assignedOperators.length > 0 ? (
+                      <div className="bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 px-2.5 py-1 rounded-full font-sans text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                        <span>Asignado: {assignedOperators.map(o => o.fullName.split(' ')[0]).join(', ')}</span>
                       </div>
+                    ) : null}
+                    {!isOperator && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setAisleToDelete(aisle); }}
+                        className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-red-100 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                        title="Eliminar pasillo"
+                      >
+                        <Trash2 size={15} />
+                      </button>
                     )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setAisleToDelete(aisle); }}
-                      className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-red-100 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
-                      title="Eliminar pasillo"
-                    >
-                      <Trash2 size={15} />
-                    </button>
                   </div>
                 </div>
                 
@@ -127,7 +155,7 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle }: Ai
                     <Icon size={140} />
                   </div>
                 )}
-              </button>
+              </div>
             )
           })}
         </section>
@@ -145,12 +173,19 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle }: Ai
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4">
+              {error && (
+                <div className="bg-error-container text-on-error-container border border-error/10 p-3.5 rounded-2xl text-[13px] font-semibold animate-in fade-in duration-200">
+                  {error}
+                </div>
+              )}
+
               <div className="flex flex-col gap-1.5">
                 <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Número de Pasillo</label>
                 <input 
                   type="number" 
                   required
                   min="1"
+                  autoFocus
                   value={aisleNumber}
                   onChange={(e) => setAisleNumber(e.target.value)}
                   placeholder="Ej. 6"

@@ -1,5 +1,5 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, doc, getDocs, writeBatch } from 'firebase/firestore';
 import { mockAisles, mockProductsByAisle } from './data';
 
@@ -92,5 +92,25 @@ export async function clearAllFirestoreData() {
   } catch (error) {
     console.error("Error al limpiar Firestore:", error);
     throw error;
+  }
+}
+
+/**
+ * Crea un usuario en Firebase Authentication usando una app secundaria temporal
+ * para no cerrar la sesión del administrador actual.
+ * El email se construye como: {username}@supersaman.com
+ */
+export async function createFirebaseUser(username: string, password: string): Promise<void> {
+  if (!isFirebaseConfigured) return;
+
+  const secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
+  const secondaryAuth = getAuth(secondaryApp);
+
+  try {
+    const email = `${username.trim().toLowerCase()}@supersaman.com`;
+    await createUserWithEmailAndPassword(secondaryAuth, email, password);
+  } finally {
+    // Siempre eliminar la app secundaria para no dejar instancias huérfanas
+    await deleteApp(secondaryApp);
   }
 }

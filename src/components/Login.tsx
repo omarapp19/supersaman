@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { auth, isFirebaseConfigured } from '../firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { LogIn, Lock, User, ShieldAlert, Sparkles } from 'lucide-react';
+import { LogIn, Lock, User, ShieldAlert } from 'lucide-react';
 
 interface LoginProps {
   onMockLogin: (user: any) => void;
@@ -41,6 +41,8 @@ export function Login({ onMockLogin }: LoginProps) {
             email: 'admin@saman.com',
             displayName: 'Admin Principal',
             photoURL: null,
+            role: 'admin',
+            username: 'admin'
           });
         } else if (normalizedEmail === 'omarapp@supersaman.com' && password === '14006312Op.') {
           await new Promise((resolve) => setTimeout(resolve, 800));
@@ -49,6 +51,30 @@ export function Login({ onMockLogin }: LoginProps) {
             email: 'omarapp@supersaman.com',
             displayName: 'Omar (Admin)',
             photoURL: null,
+            role: 'admin',
+            username: 'omarapp'
+          });
+        } else if (normalizedEmail === 'juan@supersaman.com' && password === 'operador123') {
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          onMockLogin({
+            uid: 'mock-juan-uid',
+            email: 'juan@supersaman.com',
+            displayName: 'Juan Pérez',
+            photoURL: null,
+            role: 'operador',
+            assignedAisles: [1],
+            username: 'juan'
+          });
+        } else if (normalizedEmail === 'maria@supersaman.com' && password === 'supervisor123') {
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          onMockLogin({
+            uid: 'mock-maria-uid',
+            email: 'maria@supersaman.com',
+            displayName: 'María García',
+            photoURL: null,
+            role: 'supervisor',
+            assignedAisles: [4],
+            username: 'maria'
           });
         } else {
           await new Promise((resolve) => setTimeout(resolve, 500));
@@ -66,6 +92,8 @@ export function Login({ onMockLogin }: LoginProps) {
             email: 'omarapp@supersaman.com',
             displayName: 'Omar (Admin - Fallback)',
             photoURL: null,
+            role: 'admin',
+            username: 'omarapp'
           });
           return;
         } else if (normalizedEmail === 'admin@saman.com' && password === 'admin123') {
@@ -75,6 +103,32 @@ export function Login({ onMockLogin }: LoginProps) {
             email: 'admin@saman.com',
             displayName: 'Admin Principal (Fallback)',
             photoURL: null,
+            role: 'admin',
+            username: 'admin'
+          });
+          return;
+        } else if (normalizedEmail === 'juan@supersaman.com' && password === 'operador123') {
+          await new Promise((resolve) => setTimeout(resolve, 600));
+          onMockLogin({
+            uid: 'mock-juan-uid',
+            email: 'juan@supersaman.com',
+            displayName: 'Juan Pérez',
+            photoURL: null,
+            role: 'operador',
+            assignedAisles: [1],
+            username: 'juan'
+          });
+          return;
+        } else if (normalizedEmail === 'maria@supersaman.com' && password === 'supervisor123') {
+          await new Promise((resolve) => setTimeout(resolve, 600));
+          onMockLogin({
+            uid: 'mock-maria-uid',
+            email: 'maria@supersaman.com',
+            displayName: 'María García',
+            photoURL: null,
+            role: 'supervisor',
+            assignedAisles: [4],
+            username: 'maria'
           });
           return;
         }
@@ -96,10 +150,7 @@ export function Login({ onMockLogin }: LoginProps) {
       <div className="bg-card-surface/90 border border-outline-variant/30 backdrop-blur-md rounded-[32px] w-full max-w-md p-8 md:p-10 shadow-[0_20px_50px_rgba(40,28,25,0.08)] relative z-10 transition-all">
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center text-white shadow-[0_8px_20px_rgba(62,158,87,0.3)] mb-4">
-            <Sparkles size={28} />
-          </div>
-          <h1 className="font-sans text-[26px] font-bold text-on-surface leading-tight">Sugeridos Super Saman</h1>
+          <img src="/logo.svg" alt="Súper Samán" className="w-28 h-28 mb-3 drop-shadow-md" />
           <p className="font-sans text-[14px] text-on-surface-variant mt-1">Ingresa al portal de administración de la sucursal</p>
         </div>
 

@@ -5,54 +5,72 @@
   --font-sans: "Hanken Grotesk", sans-serif;
   --font-mono: "Geist", monospace;
 
-  --color-surface-bright: #fff8f6;
-  --color-secondary: #49654d;
-  --color-surface-container: #ffe9e4;
-  --color-on-error-container: #93000a;
-  --color-error: #ba1a1a;
-  --color-surface-container-lowest: #ffffff;
-  --color-on-secondary-fixed: #05210e;
-  --color-error-container: #ffdad6;
-  --color-primary-container: #218542;
-  --color-on-error: #ffffff;
-  --color-on-tertiary-fixed-variant: #5c4300;
-  --color-tertiary: #745815;
-  --color-on-tertiary-fixed: #261900;
-  --color-surface-container-high: #fae3de;
-  --color-surface-container-low: #fff1ed;
-  --color-tertiary-fixed: #ffdea1;
-  --color-on-primary-fixed-variant: #005322;
-  --color-surface: #DDEBEA;
-  --color-on-secondary: #ffffff;
-  --color-secondary-fixed-dim: #afceb2;
-  --color-on-secondary-container: #4f6b53;
-  --color-surface-variant: #f4ded8;
-  --color-on-primary: #ffffff;
-  --color-secondary-fixed: #caebcd;
-  --color-secondary-container: #caebcd;
-  --color-primary-fixed-dim: #7bdb8d;
-  --color-inverse-primary: #7bdb8d;
-  --color-on-secondary-fixed-variant: #314d37;
-  --color-on-tertiary: #ffffff;
-  --color-surface-dim: #ebd5d0;
-  --color-outline-variant: #becabb;
-  --color-surface-container-highest: #f4ded8;
-  --color-on-primary-container: #f7fff3;
-  --color-outline: #6f7a6e;
-  --color-on-tertiary-container: #fffbff;
-  --color-inverse-surface: #3b2d2a;
-  --color-background: #DDEBEA;
-  --color-surface-tint: #006d30;
-  --color-on-surface-variant: #3f493f;
-  --color-primary-fixed: #96f8a6;
-  --color-on-primary-fixed: #00210a;
+  /* === PALETA OFICIAL SÚPER SAMÁN === */
+  /* Primarios */
   --color-primary: #3E9E57;
-  --color-tertiary-container: #8f702c;
-  --color-on-surface: #281C19;
-  --color-inverse-on-surface: #ffede9;
-  --color-on-background: #281C19;
-  --color-tertiary-fixed-dim: #e8c175;
+  --color-primary-container: #2C6839;
+  --color-primary-fixed: #DDEBEA;
+  --color-primary-fixed-dim: #B2D4C8;
+  --color-inverse-primary: #3E9E57;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #F6ECDF;
+  --color-on-primary-fixed: #281C19;
+  --color-on-primary-fixed-variant: #2C6839;
+
+  /* Secundarios */
+  --color-secondary: #405C45;
+  --color-secondary-container: #DDEBEA;
+  --color-secondary-fixed: #DDEBEA;
+  --color-secondary-fixed-dim: #B2D4C8;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #2C6839;
+  --color-on-secondary-fixed: #281C19;
+  --color-on-secondary-fixed-variant: #405C45;
+
+  /* Terciarios (dorado/tierra) */
+  --color-tertiary: #B78F6E;
+  --color-tertiary-container: #FFD788;
+  --color-tertiary-fixed: #FFD788;
+  --color-tertiary-fixed-dim: #E8B85A;
+  --color-on-tertiary: #281C19;
+  --color-on-tertiary-container: #281C19;
+  --color-on-tertiary-fixed: #281C19;
+  --color-on-tertiary-fixed-variant: #5c4300;
+
+  /* Superficies */
+  --color-surface: #DDEBEA;
+  --color-surface-bright: #EFF6F5;
+  --color-surface-dim: #C8DEDD;
+  --color-surface-variant: #D0E8D5;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #EFF6F5;
+  --color-surface-container: #E5F0EF;
+  --color-surface-container-high: #DDEAE9;
+  --color-surface-container-highest: #D0E0DF;
+  --color-background: #DDEBEA;
   --color-card-surface: #F6ECDF;
+  --color-inverse-surface: #281C19;
+  --color-inverse-on-surface: #F6ECDF;
+
+  /* Textos sobre superficies */
+  --color-on-surface: #281C19;
+  --color-on-surface-variant: #405C45;
+  --color-on-background: #281C19;
+
+  /* Contornos */
+  --color-outline: #6f7a6e;
+  --color-outline-variant: #B2C4B5;
+
+  /* Tint */
+  --color-surface-tint: #3E9E57;
+
+  /* Errores */
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #93000a;
+
+  /* Banner offline */
   --color-offline-banner: #FFD788;
 }
 
@@ -74,10 +92,10 @@ body {
 .offline-banner {
   background: repeating-linear-gradient(
     -45deg,
-    #fae3de,
-    #fae3de 10px,
-    #fff1ed 10px,
-    #fff1ed 20px
+    #FFD788,
+    #FFD788 10px,
+    #F6ECDF 10px,
+    #F6ECDF 20px
   );
 }
 
@@ -87,9 +105,16 @@ body {
 }
 
 @media print {
-  body { background: white !important; color: black !important; }
+  body { background: white !important; color: black !important; font-size: 11pt !important; }
   .print-hide { display: none !important; }
   .table-container { box-shadow: none !important; border: none !important; background: transparent !important; }
-  th, td { border-bottom: 1px solid #000 !important; color: #000 !important; }
-  th { border-bottom: 2px solid #000 !important; font-weight: bold !important; }
+  th, td { border-bottom: 1px solid #d1d5db !important; color: #000 !important; padding: 8px 12px !important; }
+  th { border-bottom: 2px solid #000 !important; font-weight: bold !important; text-align: left !important; }
+  tr { page-break-inside: avoid; break-inside: avoid; }
+  .print-group-section { page-break-inside: avoid; break-inside: avoid; margin-bottom: 32px; }
+  
+  @page {
+    margin: 1.5cm;
+    size: portrait;
+  }
 }

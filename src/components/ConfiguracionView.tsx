@@ -1,81 +1,87 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, Dispatch, SetStateAction } from 'react';
 import { Shield, Bell, Cpu, Sparkles, Check, RefreshCw, Database, Trash2, Users, UserPlus, Edit, X } from 'lucide-react';
-import { db, isFirebaseConfigured, bootstrapFirestore, clearAllFirestoreData } from '../firebase';
+import { db, isFirebaseConfigured, bootstrapFirestore, clearAllFirestoreData, createFirebaseUser } from '../firebase';
 import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { Aisle } from '../types';
+import { useToast } from './Toast';
 
 interface ConfiguracionViewProps {
   aisles: Aisle[];
+  users: any[];
+  setUsers: Dispatch<SetStateAction<any[]>>;
 }
 
-export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
-  const [pushAlerts, setPushAlerts] = useState(true);
+export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionViewProps) {
+  const toast = useToast();
+  const [pushAlerts, setPushAlerts] = useState(() => localStorage.getItem('saman_push_alerts') !== 'false');
   const [offlineSync, setOfflineSync] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [dbActionLoading, setDbActionLoading] = useState(false);
   const [dbMessage, setDbMessage] = useState<string | null>(null);
 
   // User Management States
-  const [users, setUsers] = useState<any[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [userFullName, setUserFullName] = useState('');
   const [userUsername, setUserUsername] = useState('');
   const [userPassword, setUserPassword] = useState('');
   const [userRole, setUserRole] = useState<'admin' | 'supervisor' | 'operador'>('operador');
-  const [userAisle, setUserAisle] = useState<number | undefined>(undefined);
+  const [userAisles, setUserAisles] = useState<number[]>([]);
 
-  // Sync users list in real-time
-  useEffect(() => {
-    if (isFirebaseConfigured) {
-      const usersRef = collection(db, 'users');
-      const unsubscribe = onSnapshot(usersRef, (snapshot) => {
-        const usersData: any[] = [];
-        snapshot.forEach((doc) => {
-          usersData.push({ id: doc.id, ...doc.data() });
-        });
-        
-        // Ensure omarapp is always in the list
-        if (!usersData.some(u => u.username === 'omarapp')) {
-          usersData.unshift({
-            id: 'omarapp',
-            username: 'omarapp',
-            fullName: 'Omar (Admin)',
-            role: 'admin',
-            assignedAisle: null
-          });
-        }
+  // Confirmation Modals States
+  const [showClearDbModal, setShowClearDbModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<{ id: string, username: string } | null>(null);
 
-        setUsers(usersData);
-      }, (error) => {
-        console.error("Error al escuchar usuarios de Firestore:", error);
-      });
-      return unsubscribe;
-    } else {
-      setUsers([
-        { id: 'omarapp', username: 'omarapp', fullName: 'Omar (Admin)', role: 'admin' },
-        { id: 'u2', username: 'juan', fullName: 'Juan Pérez', role: 'operador', assignedAisle: 1 },
-        { id: 'u3', username: 'maria', fullName: 'María García', role: 'supervisor', assignedAisle: 4 }
-      ]);
-    }
-  }, []);
+
 
   const triggerSync = () => {
     setSyncing(true);
-    setTimeout(() => setSyncing(false), 1500);
+    setTimeout(() => {
+      setSyncing(false);
+      toast.success('Sincronización forzada completada con éxito.');
+    }, 1500);
   };
 
-  const handleClearDatabase = async () => {
-    if (!confirm('¿Estás seguro de que deseas vaciar toda la base de datos de Firestore? Se eliminarán todos los pasillos, productos y sugeridos.')) {
-      return;
+  const togglePushAlerts = async () => {
+    const newValue = !pushAlerts;
+    setPushAlerts(newValue);
+    localStorage.setItem('saman_push_alerts', String(newValue));
+    
+    if (newValue) {
+      if (!('Notification' in window)) {
+        toast.error('Este navegador no soporta notificaciones de escritorio.');
+        setPushAlerts(false);
+        localStorage.setItem('saman_push_alerts', 'false');
+        return;
+      }
+      
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        toast.success('¡Notificaciones Push activadas!');
+        new Notification('Súper Samán', {
+          body: 'Las notificaciones de stock crítico están activadas y configuradas.',
+          icon: '/logo.svg'
+        });
+      } else {
+        toast.warning('Permiso de notificaciones denegado. Habilítalo en tu navegador.');
+        setPushAlerts(false);
+        localStorage.setItem('saman_push_alerts', 'false');
+      }
+    } else {
+      toast.info('Notificaciones de stock desactivadas.');
     }
+  };
+
+  const handleClearDatabaseAction = async () => {
     setDbActionLoading(true);
     setDbMessage(null);
     try {
       await clearAllFirestoreData();
+      toast.success('Base de datos vaciada con éxito.');
       setDbMessage('Base de datos vaciada con éxito.');
     } catch (error) {
-      setDbMessage('Error al vaciar la base de datos: ' + (error as Error).message);
+      toast.error('Error al vaciar la base de datos: ' + (error as Error).message);
+      setDbMessage('Error al vaciar la base de datos.');
     } finally {
       setDbActionLoading(false);
     }
@@ -86,9 +92,11 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
     setDbMessage(null);
     try {
       await bootstrapFirestore(true);
+      toast.success('Datos de ejemplo cargados con éxito.');
       setDbMessage('Datos de ejemplo cargados con éxito.');
     } catch (error) {
-      setDbMessage('Error al cargar datos de ejemplo: ' + (error as Error).message);
+      toast.error('Error al cargar datos de ejemplo: ' + (error as Error).message);
+      setDbMessage('Error al cargar datos de ejemplo.');
     } finally {
       setDbActionLoading(false);
     }
@@ -104,7 +112,7 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
       username: userUsername.trim(),
       fullName: userFullName.trim(),
       role: userRole,
-      assignedAisle: userAisle || null
+      assignedAisles: userAisles
     };
 
     if (isFirebaseConfigured) {
@@ -113,13 +121,17 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
           const userRef = doc(db, 'users', editingUserId);
           await updateDoc(userRef, profile);
         } else {
-          // In Firestore, use the username as doc ID for simplicity
+          // En Firestore usamos el username como ID del documento
           const userRef = doc(db, 'users', usernameKey);
+          // Primero crear en Firebase Authentication
+          await createFirebaseUser(usernameKey, userPassword.trim());
+          // Luego guardar el perfil en Firestore
           await setDoc(userRef, profile);
         }
+        toast.success(editingUserId ? 'Usuario actualizado con éxito.' : 'Usuario creado con éxito.');
       } catch (error) {
         console.error("Error al guardar usuario en Firestore:", error);
-        alert("Error al guardar usuario: " + (error as Error).message);
+        toast.error("Error al guardar usuario: " + (error as Error).message);
       }
     } else {
       if (editingUserId) {
@@ -131,30 +143,18 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
         };
         setUsers(prev => [...prev, newUser]);
       }
+      toast.success(editingUserId ? 'Usuario actualizado localmente.' : 'Usuario creado localmente.');
     }
 
     setShowUserModal(false);
   };
 
-  const handleDeleteUser = async (id: string, username: string) => {
+  const handleDeleteUserClick = (id: string, username: string) => {
     if (username === 'omarapp') {
-      alert("No puedes eliminar al usuario Administrador principal.");
+      toast.error("No puedes eliminar al usuario Administrador principal.");
       return;
     }
-    if (!confirm(`¿Estás seguro de que deseas eliminar al usuario @${username}?`)) {
-      return;
-    }
-
-    if (isFirebaseConfigured) {
-      try {
-        await deleteDoc(doc(db, 'users', id));
-      } catch (error) {
-        console.error("Error al eliminar usuario en Firestore:", error);
-        alert("Error al eliminar: " + (error as Error).message);
-      }
-    } else {
-      setUsers(prev => prev.filter(u => u.id !== id));
-    }
+    setUserToDelete({ id, username });
   };
 
   return (
@@ -190,7 +190,7 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
                   <input 
                     type="checkbox" 
                     checked={pushAlerts} 
-                    onChange={() => setPushAlerts(!pushAlerts)} 
+                    onChange={togglePushAlerts} 
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-outline-variant/50 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
@@ -206,7 +206,10 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
                   <input 
                     type="checkbox" 
                     checked={offlineSync} 
-                    onChange={() => setOfflineSync(!offlineSync)} 
+                    onChange={() => {
+                      setOfflineSync(!offlineSync);
+                      toast.info(offlineSync ? 'Sincronización offline desactivada.' : 'Sincronización offline activada.');
+                    }} 
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-outline-variant/50 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
@@ -234,7 +237,7 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
                   setUserUsername('');
                   setUserPassword('');
                   setUserRole('operador');
-                  setUserAisle(undefined);
+                  setUserAisles([]);
                   setShowUserModal(true);
                 }}
                 className="flex items-center justify-center gap-1.5 px-5 py-2.5 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[13px] font-semibold transition-all shadow-sm cursor-pointer self-start sm:self-auto"
@@ -250,7 +253,7 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
                   <tr className="border-b border-outline-variant/30 text-on-surface-variant/80 font-mono text-[11px] uppercase tracking-wider bg-surface-variant/10">
                     <th className="py-3.5 px-4 font-semibold">Usuario</th>
                     <th className="py-3.5 px-4 font-semibold">Rol</th>
-                    <th className="py-3.5 px-4 font-semibold">Pasillo Asignado</th>
+                    <th className="py-3.5 px-4 font-semibold">Pasillos Asignados</th>
                     <th className="py-3.5 px-4 font-semibold text-right">Acciones</th>
                   </tr>
                 </thead>
@@ -272,7 +275,9 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
                         {u.role === 'operador' && <span className="px-2 py-0.5 bg-amber-500/10 text-amber-700 rounded-full font-mono text-[10px] font-bold uppercase border border-amber-500/20">Operador</span>}
                       </td>
                       <td className="py-3.5 px-4 font-mono text-[13px] text-on-surface-variant">
-                        {u.assignedAisle ? `Pasillo ${u.assignedAisle}` : 'Ninguno'}
+                        {u.assignedAisles && u.assignedAisles.length > 0
+                          ? u.assignedAisles.map((num: number) => `Pasillo ${num}`).join(', ')
+                          : 'Ninguno'}
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex justify-end gap-1.5">
@@ -282,7 +287,7 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
                               setUserFullName(u.fullName);
                               setUserUsername(u.username);
                               setUserRole(u.role);
-                              setUserAisle(u.assignedAisle || undefined);
+                              setUserAisles(u.assignedAisles || []);
                               setShowUserModal(true);
                             }}
                             className="p-1.5 rounded-lg text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
@@ -291,7 +296,7 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
                             <Edit size={16} />
                           </button>
                           <button
-                            onClick={() => handleDeleteUser(u.id, u.username)}
+                            onClick={() => handleDeleteUserClick(u.id, u.username)}
                             className="p-1.5 rounded-lg text-on-surface-variant hover:bg-error/10 hover:text-error transition-colors cursor-pointer"
                             title="Eliminar Usuario"
                           >
@@ -320,7 +325,7 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
 
             <div className="flex flex-col sm:flex-row gap-4">
               <button
-                onClick={handleClearDatabase}
+                onClick={() => setShowClearDbModal(true)}
                 disabled={dbActionLoading}
                 className="flex-1 bg-white border border-error/30 hover:bg-error/5 text-[#ba1a1a] rounded-full py-3.5 font-sans text-[14px] font-semibold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
               >
@@ -380,7 +385,7 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
             <button 
               onClick={triggerSync}
               disabled={syncing}
-              className="mt-6 w-full bg-primary text-white rounded-full py-3 font-sans text-[14px] font-semibold shadow-sm flex items-center justify-center gap-2 hover:scale-[0.98] active:scale-95 transition-transform"
+              className="mt-6 w-full bg-primary text-white rounded-full py-3 font-sans text-[14px] font-semibold shadow-sm flex items-center justify-center gap-2 hover:scale-[0.98] active:scale-95 transition-transform cursor-pointer"
             >
               <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
               {syncing ? 'Sincronizando...' : 'Forzar Sincronización'}
@@ -405,8 +410,8 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
       {/* User Creation / Edit Modal */}
       {showUserModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowUserModal(false)}>
-          <div className="bg-card-surface rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center p-6 border-b border-outline-variant/20">
+          <div className="bg-card-surface rounded-[32px] w-full max-w-md max-h-[90vh] flex flex-col shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center p-6 border-b border-outline-variant/20 flex-shrink-0">
               <h3 className="font-sans text-[20px] font-bold text-on-surface">
                 {editingUserId ? 'Editar Usuario' : 'Crear Nuevo Usuario'}
               </h3>
@@ -415,12 +420,13 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
               </button>
             </div>
 
-            <form onSubmit={handleUserSubmit} className="p-6 flex flex-col gap-4">
+            <form onSubmit={handleUserSubmit} className="p-6 flex flex-col gap-4 overflow-y-auto flex-grow">
               <div className="flex flex-col gap-1.5">
                 <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Nombre Completo</label>
                 <input 
                   type="text" 
                   required
+                  autoFocus
                   value={userFullName}
                   onChange={(e) => setUserFullName(e.target.value)}
                   placeholder="Ej. Juan Pérez"
@@ -455,32 +461,49 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Rol</label>
-                  <select 
-                    value={userRole}
-                    onChange={(e) => setUserRole(e.target.value as any)}
-                    className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3.5 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
-                  >
-                    <option value="admin">Administrador</option>
-                    <option value="supervisor">Supervisor</option>
-                    <option value="operador">Operador</option>
-                  </select>
-                </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Rol</label>
+                <select 
+                  value={userRole}
+                  onChange={(e) => setUserRole(e.target.value as any)}
+                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3.5 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+                >
+                  <option value="admin">Administrador</option>
+                  <option value="supervisor">Supervisor</option>
+                  <option value="operador">Operador</option>
+                </select>
+              </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Pasillo Asignado</label>
-                  <select 
-                    value={userAisle || ''}
-                    onChange={(e) => setUserAisle(e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                    className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3.5 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
-                  >
-                    <option value="">Ninguno</option>
-                    {aisles.map(a => (
-                      <option key={a.id} value={a.number}>Pasillo {a.number} - {a.name}</option>
-                    ))}
-                  </select>
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Pasillos Asignados</label>
+                <div className="w-full bg-white border border-outline-variant/50 rounded-2xl p-4 max-h-[120px] overflow-y-auto flex flex-col gap-2 shadow-sm">
+                  {aisles.length === 0 ? (
+                    <span className="font-sans text-[13px] text-on-surface-variant">No hay pasillos registrados</span>
+                  ) : (
+                    aisles.map(a => {
+                      const isChecked = userAisles.includes(a.number);
+                      return (
+                        <label key={a.id} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface-variant/40 cursor-pointer transition-colors border border-transparent hover:border-outline-variant/10">
+                          <input 
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setUserAisles(prev => [...prev, a.number]);
+                              } else {
+                                setUserAisles(prev => prev.filter(num => num !== a.number));
+                              }
+                            }}
+                            className="w-4.5 h-4.5 rounded text-primary focus:ring-primary/20 border-outline-variant/50 cursor-pointer"
+                          />
+                          <div className="flex flex-col cursor-pointer">
+                            <span className="font-sans text-[14px] font-semibold text-on-surface leading-none">Pasillo {a.number}</span>
+                            <span className="font-mono text-[11px] text-on-surface-variant mt-0.5">{a.name}</span>
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
@@ -500,6 +523,90 @@ export function ConfiguracionView({ aisles }: ConfiguracionViewProps) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Clear DB Confirmation Modal */}
+      {showClearDbModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowClearDbModal(false)}>
+          <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 flex flex-col items-center text-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 size={26} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-sans text-[20px] font-bold text-on-surface">Vaciar Base de Datos</h3>
+                <p className="font-sans text-[14px] text-on-surface-variant mt-1">
+                  ¿Estás seguro de que deseas vaciar toda la base de datos de Firestore? Se eliminarán todos los pasillos, productos y sugeridos. Esta acción es irreversible.
+                </p>
+              </div>
+              <div className="flex gap-3 w-full mt-2">
+                <button
+                  onClick={() => setShowClearDbModal(false)}
+                  className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    setShowClearDbModal(false);
+                    await handleClearDatabaseAction();
+                  }}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Confirmation Modal */}
+      {userToDelete && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setUserToDelete(null)}>
+          <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 flex flex-col items-center text-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 size={26} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-sans text-[20px] font-bold text-on-surface">Eliminar Usuario</h3>
+                <p className="font-sans text-[14px] text-on-surface-variant mt-1">
+                  ¿Estás seguro de que deseas eliminar al usuario <strong>@{userToDelete.username}</strong>? Esta acción no se puede deshacer.
+                </p>
+              </div>
+              <div className="flex gap-3 w-full mt-2">
+                <button
+                  onClick={() => setUserToDelete(null)}
+                  className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    const { id, username } = userToDelete;
+                    setUserToDelete(null);
+                    if (isFirebaseConfigured) {
+                      try {
+                        await deleteDoc(doc(db, 'users', id));
+                        toast.success(`Usuario @${username} eliminado con éxito.`);
+                      } catch (error) {
+                        console.error("Error al eliminar usuario en Firestore:", error);
+                        toast.error("Error al eliminar: " + (error as Error).message);
+                      }
+                    } else {
+                      setUsers(prev => prev.filter(u => u.id !== id));
+                      toast.success(`Usuario @${username} eliminado localmente.`);
+                    }
+                  }}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
