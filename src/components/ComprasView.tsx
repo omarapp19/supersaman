@@ -431,10 +431,10 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                             onClick={() => setSelectedOrder(order)}
                           >
                             <div className="min-w-0">
-                              <p className={`font-sans text-[15px] font-semibold truncate ${isChecked ? 'line-through text-on-surface-variant' : 'text-on-surface'}`}>
+                              <p className={`font-sans text-[15px] font-semibold ${isChecked ? 'line-through text-on-surface-variant' : 'text-on-surface'}`}>
                                 {order.productName}
                               </p>
-                              <p className="font-mono text-[12px] text-on-surface-variant truncate">
+                              <p className="font-mono text-[12px] text-on-surface-variant">
                                 {order.brand} · SKU {order.sku} · Pasillo {order.aisle}
                               </p>
                             </div>

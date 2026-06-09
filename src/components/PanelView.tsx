@@ -116,7 +116,7 @@ export function PanelView({ onNavigate, aisles, orders, checkedOrders }: PanelVi
                       <span className={`font-mono text-[11px] font-bold w-5 flex-shrink-0 ${i === 0 ? 'text-primary' : 'text-on-surface-variant/60'}`}>
                         #{i + 1}
                       </span>
-                      <span className="font-sans text-[13px] font-semibold text-on-surface truncate">{p.name}</span>
+                      <span className="font-sans text-[13px] font-semibold text-on-surface">{p.name}</span>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {p.confirmed > 0 && (

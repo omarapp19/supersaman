@@ -367,8 +367,8 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
                   </div>
 
                   <div className="flex flex-col justify-center overflow-hidden pr-2">
-                    <h3 className="font-sans text-[16px] font-semibold text-[#281C19] leading-snug truncate max-w-[200px] sm:max-w-xs">{product.name}</h3>
-                    <span className="font-mono text-[13px] text-[#4f6b53] truncate">{product.brand} • SKU: {product.sku}</span>
+                    <h3 className="font-sans text-[16px] font-semibold text-[#281C19] leading-snug">{product.name}</h3>
+                    <span className="font-mono text-[13px] text-[#4f6b53]">{product.brand} • SKU: {product.sku}</span>
                     
                     <div className="flex gap-1.5 mt-2">
                       <button 

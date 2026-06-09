@@ -296,7 +296,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                       {/* Product Info */}
                       <div className="flex-grow flex flex-col justify-center overflow-hidden pr-2">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-sans text-[16px] font-semibold text-[#281C19] leading-snug truncate">{product.name}</h3>
+                          <h3 className="font-sans text-[16px] font-semibold text-[#281C19] leading-snug">{product.name}</h3>
                           {product.status === 'normal' && (
                             <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-full font-mono text-[10px] font-bold uppercase">Normal</span>
                           )}
@@ -307,7 +307,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                             <span className="px-2 py-0.5 bg-rose-500/10 text-rose-700 border border-rose-500/20 rounded-full font-mono text-[10px] font-bold uppercase animate-pulse">Crítico</span>
                           )}
                         </div>
-                        <span className="font-mono text-[13px] text-[#4f6b53] truncate">{product.brand} • SKU: {product.sku}</span>
+                        <span className="font-mono text-[13px] text-[#4f6b53]">{product.brand} • SKU: {product.sku}</span>
                       </div>
 
                       {/* Delete Button */}
