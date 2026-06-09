@@ -30,22 +30,40 @@ export async function bootstrapFirestore(force: boolean = false) {
 
     if (force || aislesSnap.empty) {
       console.log("Inicializando pasillos y productos de Super Saman...");
-      const batch = writeBatch(db);
+      let batch = writeBatch(db);
+      let count = 0;
 
       // Bootstrap aisles
       for (const aisle of mockAisles) {
         const aisleDocRef = doc(db, 'aisles', aisle.id);
         batch.set(aisleDocRef, aisle);
+        count++;
+
+        if (count >= 400) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
 
         // Bootstrap products for this aisle
         const products = mockProductsByAisle[aisle.number] || [];
         for (const product of products) {
           const productDocRef = doc(db, `aisles/${aisle.id}/products`, product.id);
           batch.set(productDocRef, product);
+          count++;
+
+          if (count >= 400) {
+            await batch.commit();
+            batch = writeBatch(db);
+            count = 0;
+          }
         }
       }
 
-      await batch.commit();
+      if (count > 0) {
+        await batch.commit();
+      }
+      
       console.log("¡Inicialización de Firestore completada con éxito!");
     }
   } catch (error) {

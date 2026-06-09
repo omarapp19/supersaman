@@ -1,0 +1,22 @@
+{
+  "short_name": "Súper Samán",
+  "name": "Sugeridos Súper Samán",
+  "description": "Optimización y sugeridos de pasillos para el supermercado Súper Samán",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#DDEBEA",
+  "theme_color": "#3E9E57",
+  "display": "standalone",
+  "orientation": "portrait"
+}
