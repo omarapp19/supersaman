@@ -203,7 +203,26 @@ function AppContent() {
     }
   }, [user]);
 
-  const navigateToView = (view: ViewState, aisleNum?: number) => {
+  // Initialize history state on mount
+  useEffect(() => {
+    if (window.history.state === null) {
+      window.history.replaceState({ view: 'pasillos', aisleNum: 1 }, '');
+    }
+  }, []);
+
+  // Listen to popstate event for back button support
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state) {
+        const { view, aisleNum } = event.state;
+        navigateToView(view, aisleNum, true);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [selectedAisleNumber, user]);
+
+  const navigateToView = (view: ViewState, aisleNum?: number, fromPopState = false) => {
     if (user?.role === 'operador') {
       if (view !== 'pasillos' && view !== 'pasillo-detail' && view !== 'sugeridos' && view !== 'compras') {
         return;
@@ -214,10 +233,15 @@ function AppContent() {
         }
       }
     }
+    const resolvedAisleNum = aisleNum !== undefined ? aisleNum : selectedAisleNumber;
     if (aisleNum !== undefined) {
       setSelectedAisleNumber(aisleNum);
     }
     setCurrentView(view);
+
+    if (!fromPopState) {
+      window.history.pushState({ view, aisleNum: resolvedAisleNum }, '');
+    }
   };
 
   const handleLogout = async () => {

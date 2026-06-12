@@ -122,7 +122,7 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle, user
                           ? 'Cabezales' 
                           : `Pasillo ${aisle.number}`}
                     </span>
-                    <h3 className="font-sans text-[20px] md:text-[24px] text-on-surface font-semibold truncate max-w-[150px]">{aisle.name}</h3>
+                    <h3 className="font-sans text-[20px] md:text-[24px] text-on-surface font-semibold break-words pr-2">{aisle.name}</h3>
                   </div>
                   <div className="flex items-center gap-2">
                     {assignedOperators.length > 0 ? (

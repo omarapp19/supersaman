@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { ViewState, Product, Aisle } from '../types';
 import { mockProductsByAisle, mockAisles } from '../data';
-import { CloudOff, ArrowLeft, Search, ScanBarcode, ArrowDownAZ, Minus, Plus, Send, AlertTriangle, Lightbulb, Pencil } from 'lucide-react';
+import { CloudOff, ArrowLeft, Search, ScanBarcode, ArrowDownAZ, Minus, Plus, Send, AlertTriangle, Lightbulb, Pencil, X } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../firebase';
 import { collection, doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { useToast } from './Toast';
@@ -27,6 +27,14 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState<string>('');
 
+  // Product Creation States
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [savingProduct, setSavingProduct] = useState(false);
+  const [productName, setProductName] = useState('');
+  const [productBrand, setProductBrand] = useState('');
+  const [productSku, setProductSku] = useState('');
+  const [productUndXCaja, setProductUndXCaja] = useState('0');
+
   const isOperator = user?.role === 'operador';
   const displayedAisles = isOperator
     ? aisles.filter(a => user?.assignedAisles?.includes(a.number))
@@ -41,6 +49,28 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
       }
     }
   }, [user, aisles]);
+
+  // Listen to popstate event to handle selected aisle back button navigation
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state && event.state.view === 'sugeridos') {
+        const aisleNum = event.state.selectedAisleNum;
+        if (aisleNum) {
+          const myAisle = aisles.find(a => a.number === aisleNum);
+          setSelectedAisle(myAisle || null);
+        } else {
+          setSelectedAisle(null);
+        }
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [aisles]);
+
+  const handleSelectAisle = (a: Aisle) => {
+    setSelectedAisle(a);
+    window.history.pushState({ view: 'sugeridos', selectedAisleNum: a.number }, '');
+  };
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -140,6 +170,47 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
     }
   };
 
+  const handleProductSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (savingProduct) return;
+    setSavingProduct(true);
+
+    const initials = productName.trim().substring(0, 2).toUpperCase();
+    const val = parseInt(productUndXCaja, 10);
+    const und_x_caja = isNaN(val) ? 0 : Math.max(0, val);
+
+    const newProduct: Product = {
+      id: 'p_' + Date.now(),
+      name: productName.trim(),
+      brand: productBrand.trim(),
+      sku: productSku.trim(),
+      status: 'normal',
+      initials: initials,
+      und_x_caja: und_x_caja
+    };
+
+    try {
+      if (isFirebaseConfigured && selectedAisle?.id) {
+        const productRef = doc(db, 'aisles', selectedAisle.id, 'products', newProduct.id);
+        await setDoc(productRef, newProduct);
+      } else {
+        setProducts(prev => [...prev, newProduct].sort((a, b) => a.name.localeCompare(b.name)));
+        setQuantities(prev => ({ ...prev, [newProduct.id]: 0 }));
+        setUnits(prev => ({ ...prev, [newProduct.id]: 'und' }));
+        if (und_x_caja > 0) {
+          localStorage.setItem(`saman_und_x_caja_${newProduct.id}`, String(und_x_caja));
+        }
+      }
+      toast.success('Producto agregado con éxito.');
+      setShowProductModal(false);
+    } catch (error) {
+      console.error("Error al guardar producto:", error);
+      toast.error('Error al guardar el producto. Intenta de nuevo.');
+    } finally {
+      setSavingProduct(false);
+    }
+  };
+
   const updateQty = (id: string, delta: number) => {
     setQuantities(prev => ({
       ...prev,
@@ -162,18 +233,15 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
       const isPushEnabled = localStorage.getItem('saman_push_alerts') !== 'false';
       if (isPushEnabled && 'Notification' in window && Notification.permission === 'granted') {
         new Notification('Stock Crítico Detectado', {
-          body: `El producto "${prod.name}" (${prod.brand}) se encuentra en estado crítico en el Pasillo ${selectedAisle?.number || ''}.`,
+          body: `El producto "${prod.name}" (${prod.brand}) se encuentra en estado crítico en ${
+            selectedAisle?.name.toLowerCase().includes('nevera') 
+              ? 'la Nevera' 
+              : (selectedAisle?.name.toLowerCase().includes('cabezal') || selectedAisle?.name.toLowerCase().includes('promoción') || selectedAisle?.name.toLowerCase().includes('promociones'))
+                ? 'el Cabezal' 
+                : `el Pasillo ${selectedAisle?.number || ''}`
+          }.`,
           icon: '/logo.svg'
         });
-      }
-    }
-
-    if (isFirebaseConfigured && selectedAisle?.id) {
-      try {
-        const productRef = doc(db, 'aisles', selectedAisle.id, 'products', id);
-        await updateDoc(productRef, { status });
-      } catch (error) {
-        console.error("Error al actualizar estado del producto:", error);
       }
     }
   };
@@ -208,7 +276,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
       });
       toast.success("¡Sugerido semanal enviado con éxito!");
       // Return to aisle selector screen
-      setSelectedAisle(null);
+      window.history.back();
     } else {
       toast.error("Por favor, incrementa la cantidad sugerida de al menos un artículo para poder enviar el sugerido.");
     }
@@ -269,10 +337,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
               return (
                 <button
                   key={a.id}
-                  onClick={() => {
-                    setSelectedAisle(a);
-                    setSearchQuery('');
-                  }}
+                  onClick={() => handleSelectAisle(a)}
                   className="text-left rounded-3xl p-6 transition-transform hover:scale-[0.98] shadow-[0_4px_20px_rgba(40,28,25,0.05)] bg-card-surface border border-transparent hover:border-outline-variant/30 relative overflow-hidden group cursor-pointer"
                 >
                   <div className="flex flex-col gap-1 relative z-10">
@@ -283,7 +348,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
                           ? 'Cabezales' 
                           : `Pasillo ${a.number}`}
                     </span>
-                    <h3 className="font-sans text-[20px] md:text-[24px] text-on-surface font-semibold truncate">{a.name}</h3>
+                    <h3 className="font-sans text-[20px] md:text-[24px] text-on-surface font-semibold break-words pr-2">{a.name}</h3>
                   </div>
                   
                   <div className="flex items-center gap-6 mt-6 relative z-10">
@@ -315,23 +380,39 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
         </div>
       )}
 
-      <header className="mb-6 flex items-center gap-4">
-        <button 
-          onClick={() => setSelectedAisle(null)} 
-          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant transition-colors cursor-pointer"
-        >
-          <ArrowLeft size={24} />
-        </button>
-        <div>
-          <h2 className="font-sans text-[28px] md:text-[36px] font-bold text-on-surface leading-tight tracking-tight">
-            Sugeridos: {selectedAisle.name.toLowerCase().includes('nevera') 
-              ? 'Nevera' 
-              : (selectedAisle.name.toLowerCase().includes('cabezal') || selectedAisle.name.toLowerCase().includes('promoción') || selectedAisle.name.toLowerCase().includes('promociones'))
-                ? 'Cabezales' 
-                : `Pasillo ${selectedAisle.number}`}
-          </h2>
-          <p className="font-sans text-[15px] text-on-surface-variant mt-1">{selectedAisle.name} • Detalla el estado y especifica las cantidades a solicitar.</p>
+      <header className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => window.history.back()} 
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant transition-colors cursor-pointer flex-shrink-0"
+          >
+            <ArrowLeft size={24} />
+          </button>
+          <div>
+            <h2 className="font-sans text-[28px] md:text-[36px] font-bold text-on-surface leading-tight tracking-tight">
+              Sugeridos: {selectedAisle.name.toLowerCase().includes('nevera') 
+                ? 'Nevera' 
+                : (selectedAisle.name.toLowerCase().includes('cabezal') || selectedAisle.name.toLowerCase().includes('promoción') || selectedAisle.name.toLowerCase().includes('promociones'))
+                  ? 'Cabezales' 
+                  : `Pasillo ${selectedAisle.number}`}
+            </h2>
+            <p className="font-sans text-[15px] text-on-surface-variant mt-1">{selectedAisle.name} • Detalla el estado y especifica las cantidades a solicitar.</p>
+          </div>
         </div>
+
+        <button 
+          onClick={() => {
+            setProductName('');
+            setProductBrand('');
+            setProductSku('');
+            setProductUndXCaja('0');
+            setShowProductModal(true);
+          }}
+          className="flex items-center justify-center gap-2 px-5 py-2.5 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[13px] font-semibold transition-all shadow-sm cursor-pointer self-start sm:self-auto"
+        >
+          <Plus size={16} />
+          Agregar Producto
+        </button>
       </header>
 
       {/* Search & Sort */}
@@ -570,6 +651,88 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
             <Send size={20} />
             <span className="font-sans text-[16px] font-semibold">Enviar Sugerido Semanal</span>
           </button>
+        </div>
+      )}
+
+      {/* Product Creation Modal */}
+      {showProductModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowProductModal(false)}>
+          <div className="bg-card-surface rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center p-6 border-b border-outline-variant/20">
+              <h3 className="font-sans text-[20px] font-bold text-on-surface">Agregar Nuevo Producto</h3>
+              <button onClick={() => setShowProductModal(false)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-variant transition-colors cursor-pointer">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleProductSubmit} className="p-6 flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Nombre del Producto</label>
+                <input 
+                  type="text" 
+                  required
+                  autoFocus
+                  value={productName}
+                  onChange={(e) => setProductName(e.target.value)}
+                  placeholder="Ej. Leche Semidescremada 1L"
+                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Marca</label>
+                <input 
+                  type="text" 
+                  required
+                  value={productBrand}
+                  onChange={(e) => setProductBrand(e.target.value)}
+                  placeholder="Ej. Parmalat"
+                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">SKU / Código</label>
+                <input 
+                  type="text" 
+                  required
+                  value={productSku}
+                  onChange={(e) => setProductSku(e.target.value)}
+                  placeholder="Ej. 75010203"
+                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Unidades por Caja</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  value={productUndXCaja}
+                  onChange={(e) => setProductUndXCaja(e.target.value)}
+                  placeholder="Ej. 24"
+                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+                />
+              </div>
+
+              <div className="flex gap-3 mt-4">
+                <button 
+                  type="button"
+                  onClick={() => setShowProductModal(false)}
+                  className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={savingProduct}
+                  className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {savingProduct ? 'Guardando...' : 'Crear Producto'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

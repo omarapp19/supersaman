@@ -50,7 +50,6 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
   const [productName, setProductName] = useState('');
   const [productBrand, setProductBrand] = useState('');
   const [productSku, setProductSku] = useState('');
-  const [productStatusSelect, setProductStatusSelect] = useState<'normal' | 'bajo' | 'crítico'>('normal');
   const [productUndXCaja, setProductUndXCaja] = useState('0');
   const [showScanner, setShowScanner] = useState(false);
 
@@ -60,7 +59,6 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
     setProductName('');
     setProductBrand('');
     setProductSku(code);
-    setProductStatusSelect('normal');
     setProductUndXCaja('0');
     setShowProductModal(true);
   };
@@ -110,7 +108,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
       name: productName.trim(),
       brand: productBrand.trim(),
       sku: productSku.trim(),
-      status: productStatusSelect,
+      status: 'normal',
       initials: initials,
       und_x_caja: und_x_caja
     };
@@ -231,7 +229,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
 
       {/* Header */}
       <header className="flex items-center justify-between mb-4">
-        <button onClick={() => onNavigate('pasillos')} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant transition-colors">
+        <button onClick={() => window.history.back()} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant transition-colors">
           <ArrowLeft size={24} />
         </button>
         <h1 className="font-sans text-[20px] font-semibold text-on-surface">
@@ -476,18 +474,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                 />
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Estado Inicial</label>
-                <select 
-                  value={productStatusSelect}
-                  onChange={(e) => setProductStatusSelect(e.target.value as any)}
-                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3.5 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
-                >
-                  <option value="normal">Normal</option>
-                  <option value="bajo">Bajo</option>
-                  <option value="crítico">Crítico</option>
-                </select>
-              </div>
+
 
               <div className="flex flex-col gap-1.5">
                 <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Unidades por Caja</label>
