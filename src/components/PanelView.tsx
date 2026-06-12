@@ -164,7 +164,13 @@ export function PanelView({ onNavigate, aisles, orders, checkedOrders }: PanelVi
                 <div className={`absolute top-0 left-0 w-full h-1 ${color}`}></div>
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h4 className="font-sans text-[20px] font-bold text-on-surface">Pasillo {aisle.number}</h4>
+                    <h4 className="font-sans text-[20px] font-bold text-on-surface">
+                      {aisle.name.toLowerCase().includes('nevera') 
+                        ? 'Nevera' 
+                        : (aisle.name.toLowerCase().includes('cabezal') || aisle.name.toLowerCase().includes('promoción') || aisle.name.toLowerCase().includes('promociones'))
+                          ? 'Cabezales' 
+                          : `Pasillo ${aisle.number}`}
+                    </h4>
                     <span className="font-mono text-[13px] opacity-60">{aisle.name}</span>
                   </div>
                 </div>

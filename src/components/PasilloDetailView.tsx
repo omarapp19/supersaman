@@ -1,7 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { ViewState, Product, Aisle } from '../types';
 import { mockProductsByAisle, mockAisles } from '../data';
-import { CloudOff, ArrowLeft, MoreVertical, Search, ScanBarcode, ArrowDownAZ, Plus, X, Trash2 } from 'lucide-react';
+import { CloudOff, ArrowLeft, MoreVertical, Search, ScanBarcode, ArrowDownAZ, Plus, X, Trash2, Pencil } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../firebase';
 import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { BarcodeScanner } from './BarcodeScanner';
@@ -40,6 +40,10 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
+  // Product Editing States
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [tempValue, setTempValue] = useState<string>('');
+
   // Product Creation States
   const [showProductModal, setShowProductModal] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
@@ -47,6 +51,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
   const [productBrand, setProductBrand] = useState('');
   const [productSku, setProductSku] = useState('');
   const [productStatusSelect, setProductStatusSelect] = useState<'normal' | 'bajo' | 'crítico'>('normal');
+  const [productUndXCaja, setProductUndXCaja] = useState('0');
   const [showScanner, setShowScanner] = useState(false);
 
   const handleScanResult = (code: string) => {
@@ -56,6 +61,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
     setProductBrand('');
     setProductSku(code);
     setProductStatusSelect('normal');
+    setProductUndXCaja('0');
     setShowProductModal(true);
   };
 
@@ -69,12 +75,35 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
     setProductToDelete(null);
   };
 
+  const handleUpdateUndXCaja = async (productId: string, valueStr: string) => {
+    const val = parseInt(valueStr, 10);
+    const und_x_caja = isNaN(val) ? 0 : Math.max(0, val);
+
+    try {
+      if (isFirebaseConfigured && aisle?.id) {
+        const productRef = doc(db, 'aisles', aisle.id, 'products', productId);
+        await setDoc(productRef, { und_x_caja }, { merge: true });
+      } else {
+        // Mode demo: update local state and localStorage
+        setProducts(prev => prev.map(p => p.id === productId ? { ...p, und_x_caja } : p));
+        localStorage.setItem(`saman_und_x_caja_${productId}`, String(und_x_caja));
+      }
+      toast.success('Unidades por caja actualizadas.');
+      setEditingProductId(null);
+    } catch (error) {
+      console.error("Error al actualizar unidades por caja:", error);
+      toast.error('Error al guardar. Intenta de nuevo.');
+    }
+  };
+
   const handleProductSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (savingProduct) return; // Evita doble submit
     setSavingProduct(true);
 
     const initials = productName.trim().substring(0, 2).toUpperCase();
+    const val = parseInt(productUndXCaja, 10);
+    const und_x_caja = isNaN(val) ? 0 : Math.max(0, val);
 
     const newProduct: Product = {
       id: 'p_' + Date.now(),
@@ -82,7 +111,8 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
       brand: productBrand.trim(),
       sku: productSku.trim(),
       status: productStatusSelect,
-      initials: initials
+      initials: initials,
+      und_x_caja: und_x_caja
     };
 
     try {
@@ -91,6 +121,10 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
         await setDoc(productRef, newProduct);
       } else {
         setProducts(prev => [...prev, newProduct].sort((a, b) => a.name.localeCompare(b.name)));
+        // Also save to localStorage in demo mode if specified
+        if (und_x_caja > 0) {
+          localStorage.setItem(`saman_und_x_caja_${newProduct.id}`, String(und_x_caja));
+        }
       }
       
       // Trigger Push Notification if stock is critical and setting is active
@@ -146,7 +180,11 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
       return unsubscribe;
     } else {
       const freshProducts = mockProductsByAisle[selectedAisleNumber] || [];
-      setProducts(freshProducts);
+      const productsWithLocalData = freshProducts.map(p => {
+        const localVal = localStorage.getItem(`saman_und_x_caja_${p.id}`);
+        return localVal !== null ? { ...p, und_x_caja: parseInt(localVal, 10) } : p;
+      });
+      setProducts(productsWithLocalData);
     }
   }, [selectedAisleNumber, aisle?.id]);
 
@@ -196,7 +234,13 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
         <button onClick={() => onNavigate('pasillos')} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant transition-colors">
           <ArrowLeft size={24} />
         </button>
-        <h1 className="font-sans text-[20px] font-semibold text-on-surface">Detalle de Pasillo</h1>
+        <h1 className="font-sans text-[20px] font-semibold text-on-surface">
+          {aisle.name.toLowerCase().includes('nevera') 
+            ? 'Detalle de Nevera' 
+            : (aisle.name.toLowerCase().includes('cabezal') || aisle.name.toLowerCase().includes('promoción') || aisle.name.toLowerCase().includes('promociones'))
+              ? 'Detalle de Cabezales' 
+              : 'Detalle de Pasillo'}
+        </h1>
         <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant transition-colors">
           <MoreVertical size={24} />
         </button>
@@ -224,7 +268,13 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
       </div>
 
       <div className="flex items-center justify-between px-2 mb-6">
-        <span className="font-mono text-[13px] text-on-surface-variant">En Pasillo {aisle.number} - {aisle.name}</span>
+        <span className="font-mono text-[13px] text-on-surface-variant">
+          {aisle.name.toLowerCase().includes('nevera') 
+            ? `En ${aisle.name}` 
+            : (aisle.name.toLowerCase().includes('cabezal') || aisle.name.toLowerCase().includes('promoción') || aisle.name.toLowerCase().includes('promociones'))
+              ? `En ${aisle.name}` 
+              : `En Pasillo ${aisle.number} - ${aisle.name}`}
+        </span>
         <div className="flex items-center gap-2">
           <button 
             onClick={() => {
@@ -232,6 +282,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
               setProductBrand('');
               setProductSku('');
               setProductStatusSelect('normal');
+              setProductUndXCaja('0');
               setShowProductModal(true);
             }}
             className="flex items-center gap-1 text-primary font-mono text-[13px] font-semibold hover:bg-primary/5 px-3 py-1.5 rounded-full border border-primary/20 transition-colors cursor-pointer bg-white"
@@ -307,7 +358,56 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                             <span className="px-2 py-0.5 bg-rose-500/10 text-rose-700 border border-rose-500/20 rounded-full font-mono text-[10px] font-bold uppercase animate-pulse">Crítico</span>
                           )}
                         </div>
-                        <span className="font-mono text-[13px] text-[#4f6b53]">{product.brand} • SKU: {product.sku}</span>
+                        {editingProductId === product.id ? (
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className="font-mono text-[13px] text-[#4f6b53]">Caja:</span>
+                            <input
+                              type="number"
+                              value={tempValue}
+                              min="0"
+                              onChange={(e) => setTempValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleUpdateUndXCaja(product.id, tempValue);
+                                } else if (e.key === 'Escape') {
+                                  setEditingProductId(null);
+                                }
+                              }}
+                              className="w-16 px-1.5 py-0.5 border border-primary rounded font-mono text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleUpdateUndXCaja(product.id, tempValue)}
+                              className="px-2 py-0.5 bg-primary text-white rounded font-sans text-[11px] font-semibold hover:bg-primary/95 cursor-pointer"
+                            >
+                              Guardar
+                            </button>
+                            <button
+                              onClick={() => setEditingProductId(null)}
+                              className="px-2 py-0.5 bg-white border border-outline-variant/50 rounded font-sans text-[11px] text-on-surface-variant hover:bg-surface-variant/50 cursor-pointer"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono text-[13px] text-[#4f6b53]">
+                              {product.brand} • SKU: {product.sku} • Caja: {product.und_x_caja ?? 0} und
+                            </span>
+                            {(user?.role === 'operador' || user?.role === 'admin') && (
+                              <button
+                                onClick={() => {
+                                  setEditingProductId(product.id);
+                                  setTempValue(String(product.und_x_caja ?? 0));
+                                }}
+                                className="text-primary hover:text-primary/70 transition-colors p-0.5 inline-flex items-center gap-0.5 cursor-pointer"
+                                title="Editar unidades por caja"
+                              >
+                                <Pencil size={12} />
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Delete Button */}
@@ -387,6 +487,18 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                   <option value="bajo">Bajo</option>
                   <option value="crítico">Crítico</option>
                 </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Unidades por Caja</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  value={productUndXCaja}
+                  onChange={(e) => setProductUndXCaja(e.target.value)}
+                  placeholder="Ej. 24"
+                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+                />
               </div>
 
               <div className="flex gap-3 mt-4">

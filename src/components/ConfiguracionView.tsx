@@ -3,6 +3,7 @@ import { Shield, Bell, Cpu, Sparkles, Check, RefreshCw, Database, Trash2, Users,
 import { db, isFirebaseConfigured, bootstrapFirestore, clearAllFirestoreData, createFirebaseUser } from '../firebase';
 import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { Aisle } from '../types';
+import { mockProductsByAisle } from '../data';
 import { useToast } from './Toast';
 
 interface ConfiguracionViewProps {
@@ -97,6 +98,115 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
     } catch (error) {
       toast.error('Error al cargar datos de ejemplo: ' + (error as Error).message);
       setDbMessage('Error al cargar datos de ejemplo.');
+    } finally {
+      setDbActionLoading(false);
+    }
+  };
+
+  const handleImportJson = async () => {
+    setDbActionLoading(true);
+    setDbMessage(null);
+    try {
+      const response = await fetch('/datos act.json');
+      if (!response.ok) {
+        throw new Error('No se pudo leer el archivo datos act.json. Asegúrate de que esté en la carpeta public.');
+      }
+      const jsonData = await response.json();
+      
+      let aisleCount = 0;
+      let productCount = 0;
+
+      // Dynamically map all sections in the JSON file
+      const keys = Object.keys(jsonData);
+      const aisleMapping: Record<string, { number: number; id: string; name: string }> = {};
+      keys.forEach((key, index) => {
+        const number = index + 1;
+        aisleMapping[key] = {
+          number: number,
+          id: `a_${number}`,
+          name: key
+        };
+      });
+
+      if (isFirebaseConfigured) {
+        const { writeBatch, collection, doc } = await import('firebase/firestore');
+        let batch = writeBatch(db);
+        let batchSize = 0;
+
+        for (const [key, items] of Object.entries(jsonData)) {
+          const mapping = aisleMapping[key];
+          if (!mapping) continue;
+          const aisleNumber = mapping.number;
+          const aisleName = mapping.name;
+          const aisleId = mapping.id;
+
+          const aisleRef = doc(db, 'aisles', aisleId);
+          batch.set(aisleRef, {
+            id: aisleId,
+            number: aisleNumber,
+            name: aisleName,
+            status: 'unassigned',
+            progress: 0,
+            productsCount: (items as any[]).length
+          });
+          batchSize++;
+          aisleCount++;
+
+          const freshProducts = mockProductsByAisle[aisleNumber] || [];
+
+          for (let i = 0; i < (items as any[]).length; i++) {
+            const item = (items as any[])[i];
+            const matched = freshProducts.find(p => p.name === item.producto);
+            const productId = matched?.id || `p_${aisleNumber}_${i}`;
+            const initials = matched?.initials || item.producto.substring(0, 2).toUpperCase();
+
+            const productRef = doc(db, `aisles/${aisleId}/products`, productId);
+            batch.set(productRef, {
+              id: productId,
+              name: item.producto,
+              brand: matched?.brand || '',
+              sku: matched?.sku || '',
+              status: matched?.status || 'normal',
+              initials,
+              und_x_caja: item.und_x_caja || 0
+            });
+            batchSize++;
+            productCount++;
+
+            if (batchSize >= 400) {
+              await batch.commit();
+              batch = writeBatch(db);
+              batchSize = 0;
+            }
+          }
+        }
+
+        if (batchSize > 0) {
+          await batch.commit();
+        }
+      } else {
+        for (const [key, items] of Object.entries(jsonData)) {
+          const mapping = aisleMapping[key];
+          if (!mapping) continue;
+          const aisleNumber = mapping.number;
+          const freshProducts = mockProductsByAisle[aisleNumber] || [];
+
+          for (let i = 0; i < (items as any[]).length; i++) {
+            const item = (items as any[])[i];
+            const matched = freshProducts.find(p => p.name === item.producto);
+            const productId = matched?.id || `p_${aisleNumber}_${i}`;
+            localStorage.setItem(`saman_und_x_caja_${productId}`, String(item.und_x_caja || 0));
+            productCount++;
+          }
+          aisleCount++;
+        }
+      }
+
+      toast.success(`Importación exitosa: ${aisleCount} pasillos y ${productCount} productos sincronizados.`);
+      setDbMessage(`Importación exitosa: ${aisleCount} pasillos y ${productCount} productos sincronizados.`);
+    } catch (error) {
+      toast.error('Error al importar datos: ' + (error as Error).message);
+      setDbMessage('Error al importar datos.');
     } finally {
       setDbActionLoading(false);
     }
@@ -344,12 +454,21 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
               </button>
 
               <button
+                onClick={handleImportJson}
+                disabled={dbActionLoading}
+                className="flex-1 bg-primary/10 text-primary hover:bg-primary/20 rounded-full py-3.5 font-sans text-[14px] font-semibold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw size={16} />
+                {dbActionLoading ? 'Importando...' : 'Importar datos act.json'}
+              </button>
+
+              <button
                 onClick={handleSeedDatabase}
                 disabled={dbActionLoading}
                 className="flex-1 bg-primary text-white hover:bg-primary/95 rounded-full py-3.5 font-sans text-[14px] font-semibold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
               >
                 <Database size={16} />
-                {dbActionLoading ? 'Cargando...' : 'Cargar Datos de Ejemplo'}
+                {dbActionLoading ? 'Cargando...' : 'Restablecer Mocks'}
               </button>
             </div>
             
@@ -507,7 +626,13 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
                             className="w-4.5 h-4.5 rounded text-primary focus:ring-primary/20 border-outline-variant/50 cursor-pointer"
                           />
                           <div className="flex flex-col cursor-pointer">
-                            <span className="font-sans text-[14px] font-semibold text-on-surface leading-none">Pasillo {a.number}</span>
+                            <span className="font-sans text-[14px] font-semibold text-on-surface leading-none">
+                              {a.name.toLowerCase().includes('nevera') 
+                                ? 'Nevera' 
+                                : (a.name.toLowerCase().includes('cabezal') || a.name.toLowerCase().includes('promoción') || a.name.toLowerCase().includes('promociones'))
+                                  ? 'Cabezal' 
+                                  : `Pasillo ${a.number}`}
+                            </span>
                             <span className="font-mono text-[11px] text-on-surface-variant mt-0.5">{a.name}</span>
                           </div>
                         </label>

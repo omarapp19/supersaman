@@ -17,6 +17,7 @@ export interface Product {
   status: 'normal' | 'bajo' | 'crítico';
   imageUrl?: string;
   initials?: string;
+  und_x_caja?: number;
 }
 
 export interface OrderItem {

@@ -24,23 +24,20 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const datosPath = path.join(__dirname, '../public/datos.json');
+const datosPath = path.join(__dirname, '../public/datos act.json');
 const rawData = JSON.parse(fs.readFileSync(datosPath, 'utf8'));
 
-const aisleMapping = {
-  "pasillo_1": { number: 1, id: "a_1", name: "Mascotas" },
-  "pasillo_2": { number: 2, id: "a_2", name: "Cuidado Personal e Higiene" },
-  "pasillo_3": { number: 3, id: "a_3", name: "Alimentos y confitería" },
-  "pasillo_4": { number: 4, id: "a_4", name: "Salsas, condimentos y pastas" },
-  "pasillo_5": { number: 5, id: "a_5", name: "Pastelería" },
-  "pasillo_6": { number: 6, id: "a_6", name: "Harinas, Arroz y Cafés" },
-  "pasillo_7": { number: 7, id: "a_7", name: "Aceites, Salsas, Enlatados y granos" },
-  "nevera_pepsi_malta": { number: 8, id: "a_8", name: "Nevera Pepsi y Malta" },
-  "nevera_cocacola": { number: 9, id: "a_9", name: "Nevera Coca-Cola y Sabores" },
-  "nevera_jugos": { number: 10, id: "a_10", name: "Nevera lácteos, yogures y jugos" },
-  "cabezales": { number: 11, id: "a_11", name: "Cabezales / Promociones" },
-  "repuestos": { number: 12, id: "a_12", name: "Repuestos y Automotriz" }
-};
+// Dynamically map all sections in the JSON file
+const keys = Object.keys(rawData);
+const aisleMapping = {};
+keys.forEach((key, index) => {
+  const number = index + 1;
+  aisleMapping[key] = {
+    number: number,
+    id: `a_${number}`,
+    name: key
+  };
+});
 
 const KNOWN_BRANDS = [
   "DOGOURMET", "SUPERCAN", "RINGO", "KANTAL", "DOG CHOW", "CAT CHOW", "GATSY", "LEPECIP", "FILPO",
@@ -162,7 +159,8 @@ async function syncToFirestore() {
 
       // Add Product documents in batches
       for (let index = 0; index < rawProducts.length; index++) {
-        const pName = rawProducts[index];
+        const pItem = rawProducts[index];
+        const pName = pItem.producto;
         const brand = extractBrand(pName);
         const initials = getInitials(pName);
         const id = `p_${mapping.number}_${index + 1}`;
@@ -173,7 +171,8 @@ async function syncToFirestore() {
           brand: brand,
           sku: "",
           status: "normal",
-          initials: initials
+          initials: initials,
+          und_x_caja: pItem.und_x_caja || 0
         };
 
         const productDocRef = doc(db, `aisles/${mapping.id}/products`, id);

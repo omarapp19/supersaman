@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { ViewState, Product, Aisle } from '../types';
 import { mockProductsByAisle, mockAisles } from '../data';
-import { CloudOff, ArrowLeft, Search, ScanBarcode, ArrowDownAZ, Minus, Plus, Send, AlertTriangle, Lightbulb } from 'lucide-react';
+import { CloudOff, ArrowLeft, Search, ScanBarcode, ArrowDownAZ, Minus, Plus, Send, AlertTriangle, Lightbulb, Pencil } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../firebase';
-import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { useToast } from './Toast';
 
 interface SugeridosViewProps {
@@ -22,6 +22,10 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  // Product Editing States
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [tempValue, setTempValue] = useState<string>('');
 
   const isOperator = user?.role === 'operador';
   const displayedAisles = isOperator
@@ -101,15 +105,40 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
       return unsubscribe;
     } else {
       const freshProducts = mockProductsByAisle[selectedAisle.number] || [];
-      setProducts(freshProducts);
+      const productsWithLocalData = freshProducts.map(p => {
+        const localVal = localStorage.getItem(`saman_und_x_caja_${p.id}`);
+        return localVal !== null ? { ...p, und_x_caja: parseInt(localVal, 10) } : p;
+      });
+      setProducts(productsWithLocalData);
       setQuantities(
-        freshProducts.reduce((acc, p) => ({ ...acc, [p.id]: 0 }), {})
+        productsWithLocalData.reduce((acc, p) => ({ ...acc, [p.id]: 0 }), {})
       );
       setUnits(
-        freshProducts.reduce((acc, p) => ({ ...acc, [p.id]: 'und' as const }), {})
+        productsWithLocalData.reduce((acc, p) => ({ ...acc, [p.id]: 'und' as const }), {})
       );
     }
   }, [selectedAisle?.id, selectedAisle?.number]);
+
+  const handleUpdateUndXCaja = async (productId: string, valueStr: string) => {
+    const val = parseInt(valueStr, 10);
+    const und_x_caja = isNaN(val) ? 0 : Math.max(0, val);
+
+    try {
+      if (isFirebaseConfigured && selectedAisle?.id) {
+        const productRef = doc(db, 'aisles', selectedAisle.id, 'products', productId);
+        await setDoc(productRef, { und_x_caja }, { merge: true });
+      } else {
+        // Mode demo: update local state and localStorage
+        setProducts(prev => prev.map(p => p.id === productId ? { ...p, und_x_caja } : p));
+        localStorage.setItem(`saman_und_x_caja_${productId}`, String(und_x_caja));
+      }
+      toast.success('Unidades por caja actualizadas.');
+      setEditingProductId(null);
+    } catch (error) {
+      console.error("Error al actualizar unidades por caja:", error);
+      toast.error('Error al guardar. Intenta de nuevo.');
+    }
+  };
 
   const updateQty = (id: string, delta: number) => {
     setQuantities(prev => ({
@@ -247,7 +276,13 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
                   className="text-left rounded-3xl p-6 transition-transform hover:scale-[0.98] shadow-[0_4px_20px_rgba(40,28,25,0.05)] bg-card-surface border border-transparent hover:border-outline-variant/30 relative overflow-hidden group cursor-pointer"
                 >
                   <div className="flex flex-col gap-1 relative z-10">
-                    <span className="font-mono text-[13px] text-on-surface-variant uppercase tracking-wider">Pasillo {a.number}</span>
+                    <span className="font-mono text-[13px] text-on-surface-variant uppercase tracking-wider">
+                      {a.name.toLowerCase().includes('nevera') 
+                        ? 'Nevera' 
+                        : (a.name.toLowerCase().includes('cabezal') || a.name.toLowerCase().includes('promoción') || a.name.toLowerCase().includes('promociones'))
+                          ? 'Cabezales' 
+                          : `Pasillo ${a.number}`}
+                    </span>
                     <h3 className="font-sans text-[20px] md:text-[24px] text-on-surface font-semibold truncate">{a.name}</h3>
                   </div>
                   
@@ -288,7 +323,13 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
           <ArrowLeft size={24} />
         </button>
         <div>
-          <h2 className="font-sans text-[28px] md:text-[36px] font-bold text-on-surface leading-tight tracking-tight">Sugeridos: Pasillo {selectedAisle.number}</h2>
+          <h2 className="font-sans text-[28px] md:text-[36px] font-bold text-on-surface leading-tight tracking-tight">
+            Sugeridos: {selectedAisle.name.toLowerCase().includes('nevera') 
+              ? 'Nevera' 
+              : (selectedAisle.name.toLowerCase().includes('cabezal') || selectedAisle.name.toLowerCase().includes('promoción') || selectedAisle.name.toLowerCase().includes('promociones'))
+                ? 'Cabezales' 
+                : `Pasillo ${selectedAisle.number}`}
+          </h2>
           <p className="font-sans text-[15px] text-on-surface-variant mt-1">{selectedAisle.name} • Detalla el estado y especifica las cantidades a solicitar.</p>
         </div>
       </header>
@@ -312,7 +353,11 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
 
       <div className="flex items-center justify-between px-2 mb-6">
         <span className="font-mono text-[13px] text-on-surface-variant">
-          Generando reporte en Pasillo {selectedAisle.number}
+          Generando reporte en {selectedAisle.name.toLowerCase().includes('nevera') 
+            ? 'Nevera' 
+            : (selectedAisle.name.toLowerCase().includes('cabezal') || selectedAisle.name.toLowerCase().includes('promoción') || selectedAisle.name.toLowerCase().includes('promociones'))
+              ? 'Cabezales' 
+              : `Pasillo ${selectedAisle.number}`}
         </span>
         <button 
           onClick={() => {
@@ -368,7 +413,56 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
 
                   <div className="flex flex-col justify-center overflow-hidden pr-2">
                     <h3 className="font-sans text-[16px] font-semibold text-[#281C19] leading-snug">{product.name}</h3>
-                    <span className="font-mono text-[13px] text-[#4f6b53]">{product.brand} • SKU: {product.sku}</span>
+                    {editingProductId === product.id ? (
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className="font-mono text-[13px] text-[#4f6b53]">Caja:</span>
+                        <input
+                          type="number"
+                          value={tempValue}
+                          min="0"
+                          onChange={(e) => setTempValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleUpdateUndXCaja(product.id, tempValue);
+                            } else if (e.key === 'Escape') {
+                              setEditingProductId(null);
+                            }
+                          }}
+                          className="w-16 px-1.5 py-0.5 border border-primary rounded font-mono text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleUpdateUndXCaja(product.id, tempValue)}
+                          className="px-2 py-0.5 bg-primary text-white rounded font-sans text-[11px] font-semibold hover:bg-primary/95 cursor-pointer"
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          onClick={() => setEditingProductId(null)}
+                          className="px-2 py-0.5 bg-white border border-outline-variant/50 rounded font-sans text-[11px] text-on-surface-variant hover:bg-surface-variant/50 cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-[13px] text-[#4f6b53]">
+                          {product.brand} • SKU: {product.sku} • Caja: {product.und_x_caja ?? 0} und
+                        </span>
+                        {(user?.role === 'operador' || user?.role === 'admin') && (
+                          <button
+                            onClick={() => {
+                              setEditingProductId(product.id);
+                              setTempValue(String(product.und_x_caja ?? 0));
+                            }}
+                            className="text-primary hover:text-primary/70 transition-colors p-0.5 inline-flex items-center gap-0.5 cursor-pointer"
+                            title="Editar unidades por caja"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                        )}
+                      </div>
+                    )}
                     
                     <div className="flex gap-1.5 mt-2">
                       <button 

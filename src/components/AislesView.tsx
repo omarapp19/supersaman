@@ -115,7 +115,13 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle, user
               >
                 <div className="flex justify-between items-start w-full relative z-10">
                   <div className="flex flex-col gap-1">
-                    <span className="font-mono text-[13px] text-on-surface-variant uppercase tracking-wider">Pasillo {aisle.number}</span>
+                    <span className="font-mono text-[13px] text-on-surface-variant uppercase tracking-wider">
+                      {aisle.name.toLowerCase().includes('nevera') 
+                        ? 'Nevera' 
+                        : (aisle.name.toLowerCase().includes('cabezal') || aisle.name.toLowerCase().includes('promoción') || aisle.name.toLowerCase().includes('promociones'))
+                          ? 'Cabezales' 
+                          : `Pasillo ${aisle.number}`}
+                    </span>
                     <h3 className="font-sans text-[20px] md:text-[24px] text-on-surface font-semibold truncate max-w-[150px]">{aisle.name}</h3>
                   </div>
                   <div className="flex items-center gap-2">
