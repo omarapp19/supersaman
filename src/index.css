@@ -127,7 +127,8 @@ body {
     font-size: 10pt !important;
   }
   tr { page-break-inside: avoid; break-inside: avoid; }
-  .print-group-section { page-break-inside: avoid; break-inside: avoid; margin-bottom: 22px; }
+  h3 { page-break-after: avoid; break-after: avoid; }
+  .print-group-section { margin-bottom: 22px; }
   
   .text-xs { font-size: 8.5pt !important; }
   .text-sm { font-size: 10pt !important; }
