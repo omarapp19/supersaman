@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Search, Printer, ChevronDown, X, Store, CheckCircle2, Circle, CalendarDays, Package } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Printer, ChevronDown, X, Store, CheckCircle2, Circle, CalendarDays, Package, ArrowUp } from 'lucide-react';
 import { ViewState, OrderItem, Aisle } from '../types';
 
 interface ComprasViewProps {
@@ -92,6 +92,27 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
   const [printGroupBy, setPrintGroupBy] = useState<'aisle' | 'day' | 'week' | 'operator'>('aisle');
   const [printScope, setPrintScope] = useState<'all' | 'pending' | 'completed'>('all');
   const [printStatusFilter, setPrintStatusFilter] = useState<'all' | 'critical' | 'critical-low'>('all');
+
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 300) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  };
 
   const isOperator = user?.role === 'operador';
   const operatorName = user?.displayName || user?.fullName || '';
@@ -763,6 +784,15 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
             </div>
           </div>
         </div>
+      )}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-[84px] md:bottom-8 right-6 md:right-8 bg-primary text-white p-3.5 rounded-full shadow-[0_8px_30px_rgba(62,158,87,0.3)] hover:bg-primary/95 hover:scale-105 active:scale-95 transition-all duration-300 z-40 cursor-pointer print:hidden animate-in fade-in slide-in-from-bottom-4 flex items-center justify-center"
+          title="Subir al inicio"
+        >
+          <ArrowUp size={22} strokeWidth={2.5} />
+        </button>
       )}
     </div>
   );
