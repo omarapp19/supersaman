@@ -134,6 +134,7 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
         let batchSize = 0;
 
         for (const [key, items] of Object.entries(jsonData)) {
+          if (key !== 'PASILLO N° 8' && key !== 'PASILLO N° 9') continue;
           const mapping = aisleMapping[key];
           if (!mapping) continue;
           const aisleNumber = mapping.number;
@@ -186,6 +187,7 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
         }
       } else {
         for (const [key, items] of Object.entries(jsonData)) {
+          if (key !== 'PASILLO N° 8' && key !== 'PASILLO N° 9') continue;
           const mapping = aisleMapping[key];
           if (!mapping) continue;
           const aisleNumber = mapping.number;
@@ -459,7 +461,7 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
                 className="flex-1 bg-primary/10 text-primary hover:bg-primary/20 rounded-full py-3.5 font-sans text-[14px] font-semibold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
               >
                 <RefreshCw size={16} />
-                {dbActionLoading ? 'Importando...' : 'Importar datos act.json'}
+                {dbActionLoading ? 'Importando...' : 'Importar Pasillo 8 y 9 (datos act.json)'}
               </button>
 
               <button
