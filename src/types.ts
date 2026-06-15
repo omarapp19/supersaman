@@ -31,4 +31,6 @@ export interface OrderItem {
   user: string;
   status: 'normal' | 'bajo' | 'crítico';
   lastUpdated: string;
+  checked?: boolean;
 }
+

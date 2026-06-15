@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ViewState, Aisle } from './types';
 import { Sidebar } from './components/Sidebar';
 import { BottomNav } from './components/BottomNav';
@@ -11,7 +11,7 @@ import { Login } from './components/Login';
 import { SugeridosView } from './components/SugeridosView';
 import { auth, isFirebaseConfigured, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs, updateDoc } from 'firebase/firestore';
 import { mockOrders, mockAisles } from './data';
 import { MapPin, LogOut } from 'lucide-react';
 import { ToastProvider, useToast } from './components/Toast';
@@ -30,8 +30,22 @@ function AppContent() {
   const [currentView, setCurrentView] = useState<ViewState>('pasillos');
   const [selectedAisleNumber, setSelectedAisleNumber] = useState<number>(1);
   const [aisles, setAisles] = useState<Aisle[]>(mockAisles);
-  const [orders, setOrders] = useState<any[]>(mockOrders);
-  const [checkedOrders, setCheckedOrders] = useState<Set<string>>(new Set());
+  const [orders, setOrders] = useState<any[]>(() => {
+    if (!isFirebaseConfigured) {
+      const stored = localStorage.getItem('saman_orders');
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch (e) {
+          return mockOrders;
+        }
+      }
+    }
+    return mockOrders;
+  });
+  const checkedOrders = useMemo(() => {
+    return new Set(orders.filter(o => o.checked).map(o => o.id));
+  }, [orders]);
   const [users, setUsers] = useState<any[]>(() => {
     return [
       { id: 'omarapp', username: 'omarapp', fullName: 'Omar (Admin)', role: 'admin', assignedAisles: [] },
@@ -41,13 +55,25 @@ function AppContent() {
   });
   const toast = useToast();
 
-  const toggleChecked = (id: string) => {
-    setCheckedOrders(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const toggleChecked = async (id: string) => {
+    const order = orders.find(o => o.id === id);
+    if (!order) return;
+    const newCheckedState = !order.checked;
+
+    if (isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'orders', id), { checked: newCheckedState });
+      } catch (error) {
+        console.error("Error al actualizar estado del pedido en Firestore:", error);
+        toast.error("Error al actualizar el estado del pedido.");
+      }
+    } else {
+      setOrders(prev => {
+        const updated = prev.map(o => o.id === id ? { ...o, checked: newCheckedState } : o);
+        localStorage.setItem('saman_orders', JSON.stringify(updated));
+        return updated;
+      });
+    }
   };
 
   useEffect(() => {
@@ -273,7 +299,11 @@ function AppContent() {
         console.error("Error al guardar órdenes en Firestore:", error);
       }
     } else {
-      setOrders(prev => [...newOrders, ...prev]);
+      setOrders(prev => {
+        const updated = [...newOrders, ...prev];
+        localStorage.setItem('saman_orders', JSON.stringify(updated));
+        return updated;
+      });
     }
   };
 
