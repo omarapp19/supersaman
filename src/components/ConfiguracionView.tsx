@@ -134,7 +134,7 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
         let batchSize = 0;
 
         for (const [key, items] of Object.entries(jsonData)) {
-          if (key !== 'PASILLO N° 8' && key !== 'PASILLO N° 9') continue;
+          if (!/PASILLO\s*(N[°º])?\s*\b[89]\b/i.test(key)) continue;
           const mapping = aisleMapping[key];
           if (!mapping) continue;
           const aisleNumber = mapping.number;
@@ -187,7 +187,7 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
         }
       } else {
         for (const [key, items] of Object.entries(jsonData)) {
-          if (key !== 'PASILLO N° 8' && key !== 'PASILLO N° 9') continue;
+          if (!/PASILLO\s*(N[°º])?\s*\b[89]\b/i.test(key)) continue;
           const mapping = aisleMapping[key];
           if (!mapping) continue;
           const aisleNumber = mapping.number;
