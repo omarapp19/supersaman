@@ -11,6 +11,16 @@ interface ComprasViewProps {
   user?: any;
 }
 
+// Format ISO date string into a short date DD/MM/YY
+function formatShortDate(isoOrLegacy: string): string {
+  const date = new Date(isoOrLegacy);
+  if (isNaN(date.getTime())) return '';
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear()).slice(-2);
+  return `${day}/${month}/${year}`;
+}
+
 // Format ISO date string into a readable day label
 function formatDayLabel(isoOrLegacy: string): string {
   // Handle legacy "Justo ahora" or other non-ISO strings
@@ -493,12 +503,11 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
         {/* Header of printed page */}
         <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-end">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight uppercase">Súper Samán</h1>
-            <p className="text-xs text-gray-600 mt-1 uppercase font-mono">Reporte de Fallas y Pedidos de Abastecimiento</p>
+            <h1 className="text-3xl font-bold tracking-tight uppercase">Súper Samán</h1>
+            <p className="text-sm text-gray-600 mt-1 uppercase font-mono">Reporte de Fallas y Pedidos de Abastecimiento</p>
           </div>
-          <div className="text-right font-mono text-xs">
+          <div className="text-right font-mono text-sm">
             <div>Fecha: {new Date().toLocaleDateString('es-VE')}</div>
-            <div>Hora: {new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}</div>
           </div>
         </div>
 
@@ -527,7 +536,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
         </div>
 
         {ordersToPrint.length === 0 ? (
-          <div className="text-center py-12 border border-dashed border-gray-300 rounded-lg text-gray-500 font-medium">
+          <div className="text-center py-12 border border-dashed border-gray-300 rounded-lg text-gray-500 font-medium text-sm">
             No hay fallas que coincidan con los filtros seleccionados.
           </div>
         ) : (
@@ -540,14 +549,14 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                 <table className="w-full border-collapse">
                   <thead>
                     <tr>
-                      <th className="border-b-2 border-black py-2 text-xs font-bold font-mono">Producto</th>
-                      <th className="border-b-2 border-black py-2 text-xs font-bold font-mono">SKU</th>
-                      {printGroupBy !== 'aisle' && <th className="border-b-2 border-black py-2 text-xs font-bold font-mono">Pasillo</th>}
-                      <th className="border-b-2 border-black py-2 text-xs font-bold font-mono text-right">Cant. Sugerida</th>
-                      <th className="border-b-2 border-black py-2 text-xs font-bold font-mono">Estado</th>
-                      {printGroupBy !== 'operator' && <th className="border-b-2 border-black py-2 text-xs font-bold font-mono">Operador</th>}
-                      {printGroupBy !== 'day' && printGroupBy !== 'week' && <th className="border-b-2 border-black py-2 text-xs font-bold font-mono">Fecha / Hora</th>}
-                      <th className="border-b-2 border-black py-2 text-xs font-bold font-mono text-center">✓</th>
+                      <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono">Producto</th>
+                      <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono">SKU</th>
+                      {printGroupBy !== 'aisle' && <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono">Pasillo</th>}
+                      <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono text-right">Cant. Sugerida</th>
+                      <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono">Estado</th>
+                      {printGroupBy !== 'operator' && <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono">Operador</th>}
+                      {printGroupBy !== 'day' && printGroupBy !== 'week' && <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono">Fecha</th>}
+                      <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono text-center">✓</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -555,14 +564,14 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                       const isChecked = checkedOrders.has(item.id);
                       return (
                         <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="py-2 text-xs font-medium border-b border-gray-200">
-                            <div>{item.productName}</div>
-                            <div className="text-[10px] text-gray-500 italic">{item.brand}</div>
+                          <td className="py-3.5 text-sm font-medium border-b border-gray-200">
+                            <div className="font-semibold">{item.productName}</div>
+                            <div className="text-xs text-gray-500 italic">{item.brand}</div>
                           </td>
-                          <td className="py-2 text-xs font-mono border-b border-gray-200">{item.sku}</td>
-                          {printGroupBy !== 'aisle' && <td className="py-2 text-xs border-b border-gray-200">Pasillo {item.aisle}</td>}
-                          <td className="py-2 text-xs font-bold text-right border-b border-gray-200">{item.suggestedQty} {item.unit || 'und'}</td>
-                          <td className="py-2 text-xs font-mono uppercase border-b border-gray-200">
+                          <td className="py-3.5 text-sm font-mono border-b border-gray-200">{item.sku || '-'}</td>
+                          {printGroupBy !== 'aisle' && <td className="py-3.5 text-sm border-b border-gray-200">Pasillo {item.aisle}</td>}
+                          <td className="py-3.5 text-sm font-bold text-right border-b border-gray-200">{item.suggestedQty} {item.unit || 'und'}</td>
+                          <td className="py-3.5 text-sm font-mono uppercase border-b border-gray-200">
                             <span className={
                               item.status === 'crítico' ? 'text-red-700 font-bold' :
                               item.status === 'bajo' ? 'text-amber-700 font-semibold' : 'text-gray-700'
@@ -570,14 +579,14 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                               {item.status}
                             </span>
                           </td>
-                          {printGroupBy !== 'operator' && <td className="py-2 text-xs border-b border-gray-200">{item.user}</td>}
+                          {printGroupBy !== 'operator' && <td className="py-3.5 text-sm border-b border-gray-200">{item.user}</td>}
                           {printGroupBy !== 'day' && printGroupBy !== 'week' && (
-                            <td className="py-2 text-xs font-mono border-b border-gray-200">
-                              {formatDayLabel(item.lastUpdated)} {formatTime(item.lastUpdated)}
+                            <td className="py-3.5 text-sm font-mono border-b border-gray-200">
+                              {formatShortDate(item.lastUpdated)}
                             </td>
                           )}
-                          <td className="py-2 text-xs text-center border-b border-gray-200 font-mono">
-                            {isChecked ? 'SI' : 'NO'}
+                          <td className="py-3.5 text-sm text-center border-b border-gray-200 font-mono">
+                            {isChecked ? 'SÍ' : 'NO'}
                           </td>
                         </tr>
                       );

@@ -1,7 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { ViewState, Product, Aisle } from '../types';
 import { mockProductsByAisle, mockAisles } from '../data';
-import { CloudOff, ArrowLeft, Search, ScanBarcode, ArrowDownAZ, Minus, Plus, Send, AlertTriangle, Lightbulb, Pencil, X } from 'lucide-react';
+import { CloudOff, ArrowLeft, Search, ScanBarcode, ArrowDownAZ, Minus, Plus, Send, AlertTriangle, Lightbulb, Pencil, X, Trash2 } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../firebase';
 import { collection, doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { useToast } from './Toast';
@@ -13,12 +13,68 @@ interface SugeridosViewProps {
   user?: any;
 }
 
+interface DraftItem {
+  productId: string;
+  productName: string;
+  brand: string;
+  sku: string;
+  suggestedQty: number;
+  unit: 'und' | 'cajas';
+  aisleNumber: number;
+  status: 'normal' | 'bajo' | 'crítico';
+}
+
 export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: SugeridosViewProps) {
   const toast = useToast();
   const [selectedAisle, setSelectedAisle] = useState<Aisle | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [units, setUnits] = useState<Record<string, 'und' | 'cajas'>>({});
+  const [draft, setDraft] = useState<Record<string, DraftItem>>(() => {
+    const stored = localStorage.getItem('saman_draft_sugeridos');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        return {};
+      }
+    }
+    return {};
+  });
+
+  const updateDraftItem = (productId: string, updates: Partial<DraftItem>) => {
+    setDraft(prev => {
+      const currentItem = prev[productId];
+      const product = products.find(p => p.id === productId);
+      
+      const pName = product?.name || currentItem?.productName || '';
+      const pBrand = product?.brand || currentItem?.brand || '';
+      const pSku = product?.sku || currentItem?.sku || '';
+      const pAisle = selectedAisle?.number || currentItem?.aisleNumber || 0;
+      const pStatus = product?.status || currentItem?.status || 'normal';
+
+      const updatedItem: DraftItem = {
+        productId,
+        productName: pName,
+        brand: pBrand,
+        sku: pSku,
+        suggestedQty: updates.suggestedQty !== undefined ? updates.suggestedQty : (currentItem?.suggestedQty || 0),
+        unit: updates.unit !== undefined ? updates.unit : (currentItem?.unit || 'und'),
+        aisleNumber: pAisle,
+        status: updates.status !== undefined ? updates.status : pStatus,
+      };
+
+      const next = { ...prev };
+      if (updatedItem.suggestedQty > 0) {
+        next[productId] = updatedItem;
+      } else {
+        delete next[productId];
+      }
+
+      localStorage.setItem('saman_draft_sugeridos', JSON.stringify(next));
+      return next;
+    });
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -99,7 +155,15 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
         });
         
         productsData.sort((a, b) => a.name.localeCompare(b.name));
-        setProducts(productsData);
+        
+        // Overlay draft status
+        const productsWithDraftStatus = productsData.map(p => {
+          if (draft[p.id]) {
+            return { ...p, status: draft[p.id].status };
+          }
+          return p;
+        });
+        setProducts(productsWithDraftStatus);
 
         // Update parent aisle count if different
         if (selectedAisle.productsCount !== productsData.length && aisles.some(a => a.id === selectedAisle.id)) {
@@ -113,7 +177,9 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
         setQuantities(prev => {
           const next = { ...prev };
           productsData.forEach(p => {
-            if (next[p.id] === undefined) {
+            if (draft[p.id]) {
+              next[p.id] = draft[p.id].suggestedQty;
+            } else if (next[p.id] === undefined) {
               next[p.id] = 0;
             }
           });
@@ -123,7 +189,9 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
         setUnits(prev => {
           const next = { ...prev };
           productsData.forEach(p => {
-            if (next[p.id] === undefined) {
+            if (draft[p.id]) {
+              next[p.id] = draft[p.id].unit;
+            } else if (next[p.id] === undefined) {
               next[p.id] = 'und';
             }
           });
@@ -137,16 +205,27 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
       const freshProducts = mockProductsByAisle[selectedAisle.number] || [];
       const productsWithLocalData = freshProducts.map(p => {
         const localVal = localStorage.getItem(`saman_und_x_caja_${p.id}`);
-        return localVal !== null ? { ...p, und_x_caja: parseInt(localVal, 10) } : p;
+        const base = localVal !== null ? { ...p, und_x_caja: parseInt(localVal, 10) } : p;
+        if (draft[p.id]) {
+          return { ...base, status: draft[p.id].status };
+        }
+        return base;
       });
       setProducts(productsWithLocalData);
       setQuantities(
-        productsWithLocalData.reduce((acc, p) => ({ ...acc, [p.id]: 0 }), {})
+        productsWithLocalData.reduce((acc, p) => ({
+          ...acc,
+          [p.id]: draft[p.id] ? draft[p.id].suggestedQty : 0
+        }), {})
       );
       setUnits(
-        productsWithLocalData.reduce((acc, p) => ({ ...acc, [p.id]: 'und' as const }), {})
+        productsWithLocalData.reduce((acc, p) => ({
+          ...acc,
+          [p.id]: draft[p.id] ? draft[p.id].unit : ('und' as const)
+        }), {})
       );
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAisle?.id, selectedAisle?.number]);
 
   const handleUpdateUndXCaja = async (productId: string, valueStr: string) => {
@@ -212,10 +291,12 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
   };
 
   const updateQty = (id: string, delta: number) => {
+    const newQty = Math.max(0, (quantities[id] || 0) + delta);
     setQuantities(prev => ({
       ...prev,
-      [id]: Math.max(0, (prev[id] || 0) + delta)
+      [id]: newQty
     }));
+    updateDraftItem(id, { suggestedQty: newQty });
   };
 
   const toggleUnit = (id: string, unit: 'und' | 'cajas') => {
@@ -223,10 +304,12 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
       ...prev,
       [id]: unit
     }));
+    updateDraftItem(id, { unit });
   };
 
   const updateProductStatus = async (id: string, status: 'normal' | 'bajo' | 'crítico') => {
     setProducts(prev => prev.map(p => p.id === id ? { ...p, status } : p));
+    updateDraftItem(id, { status });
     const prod = products.find(p => p.id === id);
 
     if (status === 'crítico' && prod) {
@@ -247,38 +330,50 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
   };
 
   const submitWeeklySuggested = () => {
-    if (!selectedAisle) return;
-    const now = new Date().toISOString();
-    const ordersToSubmit = products
-      .filter(p => (quantities[p.id] || 0) > 0)
-      .map(p => ({
-        id: 'o_' + Date.now() + '_' + p.id,
-        productName: p.name,
-        brand: p.brand,
-        sku: p.sku,
-        suggestedQty: quantities[p.id],
-        unit: units[p.id] || 'und',
-        aisle: selectedAisle.number,
+    const draftItems = Object.values(draft);
+    if (draftItems.length > 0) {
+      const now = new Date().toISOString();
+      const ordersToSubmit = draftItems.map(item => ({
+        id: 'o_' + Date.now() + '_' + item.productId,
+        productName: item.productName,
+        brand: item.brand,
+        sku: item.sku,
+        suggestedQty: item.suggestedQty,
+        unit: item.unit,
+        aisle: item.aisleNumber,
         user: user?.displayName || user?.fullName || 'Operador',
-        status: p.status,
+        status: item.status,
         lastUpdated: now
       }));
 
-    if (ordersToSubmit.length > 0) {
       onAddOrders(ordersToSubmit);
-      // Reset quantities of all products in this view to 0
-      setQuantities(prev => {
-        const next = { ...prev };
-        products.forEach(p => {
-          next[p.id] = 0;
-        });
-        return next;
-      });
+      
+      // Reset draft
+      setDraft({});
+      localStorage.removeItem('saman_draft_sugeridos');
+      
+      // Reset local quantities and units states
+      setQuantities({});
+      setUnits({});
+      
       toast.success("¡Sugerido semanal enviado con éxito!");
-      // Return to aisle selector screen
-      window.history.back();
+      
+      // Go back to aisle selector if we are currently inside an aisle
+      if (selectedAisle) {
+        window.history.back();
+      }
     } else {
       toast.error("Por favor, incrementa la cantidad sugerida de al menos un artículo para poder enviar el sugerido.");
+    }
+  };
+
+  const handleDiscardDraft = () => {
+    if (window.confirm("¿Estás seguro de que deseas descartar todo el borrador actual? Se perderán todas las cantidades sugeridas ingresadas.")) {
+      setDraft({});
+      localStorage.removeItem('saman_draft_sugeridos');
+      setQuantities({});
+      setUnits({});
+      toast.info("Borrador descartado.");
     }
   };
 
@@ -365,6 +460,29 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
               );
             })}
           </section>
+        )}
+        
+        {/* FAB */}
+        {Object.keys(draft).length > 0 && (
+          <div className="fixed bottom-[80px] md:bottom-6 left-0 md:left-64 right-0 px-4 pt-8 pb-4 bg-gradient-to-t from-[var(--color-background)] via-[var(--color-background)] to-transparent pointer-events-none z-40 flex justify-center gap-3">
+            <button 
+              onClick={handleDiscardDraft}
+              className="px-6 py-4 bg-white border border-outline-variant text-[#ba1a1a] hover:bg-red-50/50 rounded-full shadow-md flex items-center justify-center gap-2 hover:scale-[0.98] active:scale-95 transition-all pointer-events-auto cursor-pointer font-sans text-[16px] font-semibold"
+              title="Descartar borrador"
+            >
+              <Trash2 size={20} />
+              Descartar
+            </button>
+            <button 
+              onClick={submitWeeklySuggested}
+              className="flex-1 max-w-xl bg-primary text-white rounded-full py-4 shadow-[0_8px_30px_rgba(62,158,87,0.3)] flex items-center justify-center gap-2 hover:scale-[0.98] transition-transform pointer-events-auto cursor-pointer"
+            >
+              <Send size={20} />
+              <span className="font-sans text-[16px] font-semibold">
+                Enviar ({Object.values(draft).length})
+              </span>
+            </button>
+          </div>
         )}
       </div>
     );
@@ -597,7 +715,9 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
                       min={0}
                       onChange={(e) => {
                         const val = parseInt(e.target.value, 10);
-                        setQuantities(prev => ({ ...prev, [product.id]: isNaN(val) ? 0 : Math.max(0, val) }));
+                        const newQty = isNaN(val) ? 0 : Math.max(0, val);
+                        setQuantities(prev => ({ ...prev, [product.id]: newQty }));
+                        updateDraftItem(product.id, { suggestedQty: newQty });
                       }}
                       className={`font-sans text-[16px] w-12 text-center bg-transparent focus:outline-none focus:ring-0 border-none select-all font-semibold tabular-nums ${qty > 0 ? 'text-primary' : 'text-on-surface-variant'}`}
                     />
@@ -642,14 +762,24 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
       </div>
 
       {/* FAB */}
-      {products.length > 0 && (
-        <div className="fixed bottom-[80px] md:bottom-6 left-0 md:left-64 right-0 px-4 pt-8 pb-4 bg-gradient-to-t from-[var(--color-background)] via-[var(--color-background)] to-transparent pointer-events-none z-40 flex justify-center">
+      {Object.keys(draft).length > 0 && (
+        <div className="fixed bottom-[80px] md:bottom-6 left-0 md:left-64 right-0 px-4 pt-8 pb-4 bg-gradient-to-t from-[var(--color-background)] via-[var(--color-background)] to-transparent pointer-events-none z-40 flex justify-center gap-3">
+          <button 
+            onClick={handleDiscardDraft}
+            className="px-6 py-4 bg-white border border-outline-variant text-[#ba1a1a] hover:bg-red-50/50 rounded-full shadow-md flex items-center justify-center gap-2 hover:scale-[0.98] active:scale-95 transition-all pointer-events-auto cursor-pointer font-sans text-[16px] font-semibold"
+            title="Descartar borrador"
+          >
+            <Trash2 size={20} />
+            Descartar
+          </button>
           <button 
             onClick={submitWeeklySuggested}
-            className="w-full max-w-xl bg-primary text-white rounded-full py-4 shadow-[0_8px_30px_rgba(62,158,87,0.3)] flex items-center justify-center gap-2 hover:scale-[0.98] transition-transform pointer-events-auto cursor-pointer"
+            className="flex-1 max-w-xl bg-primary text-white rounded-full py-4 shadow-[0_8px_30px_rgba(62,158,87,0.3)] flex items-center justify-center gap-2 hover:scale-[0.98] transition-transform pointer-events-auto cursor-pointer"
           >
             <Send size={20} />
-            <span className="font-sans text-[16px] font-semibold">Enviar Sugerido Semanal</span>
+            <span className="font-sans text-[16px] font-semibold">
+              Enviar ({Object.values(draft).length})
+            </span>
           </button>
         </div>
       )}

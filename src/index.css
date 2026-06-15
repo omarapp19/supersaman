@@ -105,16 +105,37 @@ body {
 }
 
 @media print {
-  body { background: white !important; color: black !important; font-size: 11pt !important; }
+  body { 
+    background: white !important; 
+    color: black !important; 
+    font-size: 10pt !important; 
+  }
   .print-hide { display: none !important; }
   .table-container { box-shadow: none !important; border: none !important; background: transparent !important; }
-  th, td { border-bottom: 1px solid #d1d5db !important; color: #000 !important; padding: 8px 12px !important; }
-  th { border-bottom: 2px solid #000 !important; font-weight: bold !important; text-align: left !important; }
+  th, td { 
+    border-bottom: 1px solid #9ca3af !important; 
+    color: #000 !important; 
+    padding: 6px 8px !important; 
+  }
+  th { 
+    border-bottom: 2px solid #000 !important; 
+    font-weight: bold !important; 
+    text-align: left !important; 
+    font-size: 10.5pt !important;
+  }
+  td {
+    font-size: 10pt !important;
+  }
   tr { page-break-inside: avoid; break-inside: avoid; }
-  .print-group-section { page-break-inside: avoid; break-inside: avoid; margin-bottom: 32px; }
+  .print-group-section { page-break-inside: avoid; break-inside: avoid; margin-bottom: 22px; }
+  
+  .text-xs { font-size: 8.5pt !important; }
+  .text-sm { font-size: 10pt !important; }
+  .text-2xl { font-size: 18pt !important; }
+  .text-3xl { font-size: 22pt !important; }
   
   @page {
-    margin: 1.5cm;
+    margin: 1.2cm;
     size: portrait;
   }
 }
