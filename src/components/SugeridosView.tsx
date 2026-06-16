@@ -82,6 +82,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
   // Product Editing States
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState<string>('');
+  const [tempSku, setTempSku] = useState<string>('');
 
   // Product Creation States
   const [showProductModal, setShowProductModal] = useState(false);
@@ -205,7 +206,12 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
       const freshProducts = mockProductsByAisle[selectedAisle.number] || [];
       const productsWithLocalData = freshProducts.map(p => {
         const localVal = localStorage.getItem(`saman_und_x_caja_${p.id}`);
-        const base = localVal !== null ? { ...p, und_x_caja: parseInt(localVal, 10) } : p;
+        const localSku = localStorage.getItem(`saman_sku_${p.id}`);
+        const base = {
+          ...p,
+          und_x_caja: localVal !== null ? parseInt(localVal, 10) : p.und_x_caja,
+          sku: localSku !== null ? localSku : p.sku
+        };
         if (draft[p.id]) {
           return { ...base, status: draft[p.id].status };
         }
@@ -228,23 +234,25 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAisle?.id, selectedAisle?.number]);
 
-  const handleUpdateUndXCaja = async (productId: string, valueStr: string) => {
-    const val = parseInt(valueStr, 10);
+  const handleUpdateProductDetails = async (productId: string, skuStr: string, undXCajaStr: string) => {
+    const sku = skuStr.trim();
+    const val = parseInt(undXCajaStr, 10);
     const und_x_caja = isNaN(val) ? 0 : Math.max(0, val);
 
     try {
       if (isFirebaseConfigured && selectedAisle?.id) {
         const productRef = doc(db, 'aisles', selectedAisle.id, 'products', productId);
-        await setDoc(productRef, { und_x_caja }, { merge: true });
+        await setDoc(productRef, { sku, und_x_caja }, { merge: true });
       } else {
         // Mode demo: update local state and localStorage
-        setProducts(prev => prev.map(p => p.id === productId ? { ...p, und_x_caja } : p));
+        setProducts(prev => prev.map(p => p.id === productId ? { ...p, sku, und_x_caja } : p));
+        localStorage.setItem(`saman_sku_${productId}`, sku);
         localStorage.setItem(`saman_und_x_caja_${productId}`, String(und_x_caja));
       }
-      toast.success('Unidades por caja actualizadas.');
+      toast.success('Producto actualizado.');
       setEditingProductId(null);
     } catch (error) {
-      console.error("Error al actualizar unidades por caja:", error);
+      console.error("Error al actualizar producto:", error);
       toast.error('Error al guardar. Intenta de nuevo.');
     }
   };
@@ -276,6 +284,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
         setProducts(prev => [...prev, newProduct].sort((a, b) => a.name.localeCompare(b.name)));
         setQuantities(prev => ({ ...prev, [newProduct.id]: 0 }));
         setUnits(prev => ({ ...prev, [newProduct.id]: 'und' }));
+        localStorage.setItem(`saman_sku_${newProduct.id}`, newProduct.sku);
         if (und_x_caja > 0) {
           localStorage.setItem(`saman_und_x_caja_${newProduct.id}`, String(und_x_caja));
         }
@@ -330,7 +339,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
   };
 
   const submitWeeklySuggested = () => {
-    const draftItems = Object.values(draft);
+    const draftItems = Object.values(draft) as DraftItem[];
     if (draftItems.length > 0) {
       const now = new Date().toISOString();
       const ordersToSubmit = draftItems.map(item => ({
@@ -614,6 +623,21 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
                     <h3 className="font-sans text-[16px] font-semibold text-[#281C19] leading-snug">{product.name}</h3>
                     {editingProductId === product.id ? (
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className="font-mono text-[13px] text-[#4f6b53]">SKU:</span>
+                        <input
+                          type="text"
+                          value={tempSku}
+                          onChange={(e) => setTempSku(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleUpdateProductDetails(product.id, tempSku, tempValue);
+                            } else if (e.key === 'Escape') {
+                              setEditingProductId(null);
+                            }
+                          }}
+                          className="w-28 px-1.5 py-0.5 border border-primary rounded font-mono text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                          autoFocus
+                        />
                         <span className="font-mono text-[13px] text-[#4f6b53]">Caja:</span>
                         <input
                           type="number"
@@ -622,16 +646,15 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
                           onChange={(e) => setTempValue(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
-                              handleUpdateUndXCaja(product.id, tempValue);
+                              handleUpdateProductDetails(product.id, tempSku, tempValue);
                             } else if (e.key === 'Escape') {
                               setEditingProductId(null);
                             }
                           }}
                           className="w-16 px-1.5 py-0.5 border border-primary rounded font-mono text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-white"
-                          autoFocus
                         />
                         <button
-                          onClick={() => handleUpdateUndXCaja(product.id, tempValue)}
+                          onClick={() => handleUpdateProductDetails(product.id, tempSku, tempValue)}
                           className="px-2 py-0.5 bg-primary text-white rounded font-sans text-[11px] font-semibold hover:bg-primary/95 cursor-pointer"
                         >
                           Guardar
@@ -652,10 +675,11 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
                           <button
                             onClick={() => {
                               setEditingProductId(product.id);
+                              setTempSku(product.sku || '');
                               setTempValue(String(product.und_x_caja ?? 0));
                             }}
                             className="text-primary hover:text-primary/70 transition-colors p-0.5 inline-flex items-center gap-0.5 cursor-pointer"
-                            title="Editar unidades por caja"
+                            title="Editar producto"
                           >
                             <Pencil size={12} />
                           </button>

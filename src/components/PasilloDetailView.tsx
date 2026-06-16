@@ -43,6 +43,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
   // Product Editing States
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState<string>('');
+  const [tempSku, setTempSku] = useState<string>('');
 
   // Product Creation States
   const [showProductModal, setShowProductModal] = useState(false);
@@ -73,23 +74,25 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
     setProductToDelete(null);
   };
 
-  const handleUpdateUndXCaja = async (productId: string, valueStr: string) => {
-    const val = parseInt(valueStr, 10);
+  const handleUpdateProductDetails = async (productId: string, skuStr: string, undXCajaStr: string) => {
+    const sku = skuStr.trim();
+    const val = parseInt(undXCajaStr, 10);
     const und_x_caja = isNaN(val) ? 0 : Math.max(0, val);
 
     try {
       if (isFirebaseConfigured && aisle?.id) {
         const productRef = doc(db, 'aisles', aisle.id, 'products', productId);
-        await setDoc(productRef, { und_x_caja }, { merge: true });
+        await setDoc(productRef, { sku, und_x_caja }, { merge: true });
       } else {
         // Mode demo: update local state and localStorage
-        setProducts(prev => prev.map(p => p.id === productId ? { ...p, und_x_caja } : p));
+        setProducts(prev => prev.map(p => p.id === productId ? { ...p, sku, und_x_caja } : p));
+        localStorage.setItem(`saman_sku_${productId}`, sku);
         localStorage.setItem(`saman_und_x_caja_${productId}`, String(und_x_caja));
       }
-      toast.success('Unidades por caja actualizadas.');
+      toast.success('Producto actualizado.');
       setEditingProductId(null);
     } catch (error) {
-      console.error("Error al actualizar unidades por caja:", error);
+      console.error("Error al actualizar producto:", error);
       toast.error('Error al guardar. Intenta de nuevo.');
     }
   };
@@ -120,6 +123,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
       } else {
         setProducts(prev => [...prev, newProduct].sort((a, b) => a.name.localeCompare(b.name)));
         // Also save to localStorage in demo mode if specified
+        localStorage.setItem(`saman_sku_${newProduct.id}`, newProduct.sku);
         if (und_x_caja > 0) {
           localStorage.setItem(`saman_und_x_caja_${newProduct.id}`, String(und_x_caja));
         }
@@ -180,7 +184,12 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
       const freshProducts = mockProductsByAisle[selectedAisleNumber] || [];
       const productsWithLocalData = freshProducts.map(p => {
         const localVal = localStorage.getItem(`saman_und_x_caja_${p.id}`);
-        return localVal !== null ? { ...p, und_x_caja: parseInt(localVal, 10) } : p;
+        const localSku = localStorage.getItem(`saman_sku_${p.id}`);
+        return {
+          ...p,
+          und_x_caja: localVal !== null ? parseInt(localVal, 10) : p.und_x_caja,
+          sku: localSku !== null ? localSku : p.sku
+        };
       });
       setProducts(productsWithLocalData);
     }
@@ -279,7 +288,6 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
               setProductName('');
               setProductBrand('');
               setProductSku('');
-              setProductStatusSelect('normal');
               setProductUndXCaja('0');
               setShowProductModal(true);
             }}
@@ -358,6 +366,21 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                         </div>
                         {editingProductId === product.id ? (
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className="font-mono text-[13px] text-[#4f6b53]">SKU:</span>
+                            <input
+                              type="text"
+                              value={tempSku}
+                              onChange={(e) => setTempSku(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleUpdateProductDetails(product.id, tempSku, tempValue);
+                                } else if (e.key === 'Escape') {
+                                  setEditingProductId(null);
+                                }
+                              }}
+                              className="w-28 px-1.5 py-0.5 border border-primary rounded font-mono text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                              autoFocus
+                            />
                             <span className="font-mono text-[13px] text-[#4f6b53]">Caja:</span>
                             <input
                               type="number"
@@ -366,16 +389,15 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                               onChange={(e) => setTempValue(e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
-                                  handleUpdateUndXCaja(product.id, tempValue);
+                                  handleUpdateProductDetails(product.id, tempSku, tempValue);
                                 } else if (e.key === 'Escape') {
                                   setEditingProductId(null);
                                 }
                               }}
                               className="w-16 px-1.5 py-0.5 border border-primary rounded font-mono text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-white"
-                              autoFocus
                             />
                             <button
-                              onClick={() => handleUpdateUndXCaja(product.id, tempValue)}
+                              onClick={() => handleUpdateProductDetails(product.id, tempSku, tempValue)}
                               className="px-2 py-0.5 bg-primary text-white rounded font-sans text-[11px] font-semibold hover:bg-primary/95 cursor-pointer"
                             >
                               Guardar
@@ -396,10 +418,11 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                               <button
                                 onClick={() => {
                                   setEditingProductId(product.id);
+                                  setTempSku(product.sku || '');
                                   setTempValue(String(product.und_x_caja ?? 0));
                                 }}
                                 className="text-primary hover:text-primary/70 transition-colors p-0.5 inline-flex items-center gap-0.5 cursor-pointer"
-                                title="Editar unidades por caja"
+                                title="Editar producto"
                               >
                                 <Pencil size={12} />
                               </button>
