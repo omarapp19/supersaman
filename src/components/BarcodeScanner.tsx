@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { NotFoundException } from '@zxing/library';
+import { NotFoundException, BarcodeFormat, DecodeHintType } from '@zxing/library';
 import { X, Camera, FlipHorizontal } from 'lucide-react';
 
 interface BarcodeScannerProps {
@@ -59,7 +59,20 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
       controlsRef.current = null;
     }
 
-    const reader = new BrowserMultiFormatReader();
+    // Optimize search formats to speed up 1D barcode scanning
+    const hints = new Map();
+    const formats = [
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.ITF
+    ];
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, formats);
+
+    const reader = new BrowserMultiFormatReader(hints);
     readerRef.current = reader;
     setScanning(true);
 

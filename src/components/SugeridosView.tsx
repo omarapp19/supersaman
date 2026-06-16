@@ -715,6 +715,13 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
             </button>
           </div>
         )}
+
+        {showGlobalScanner && (
+          <BarcodeScanner
+            onScan={handleGlobalScanResult}
+            onClose={() => setShowGlobalScanner(false)}
+          />
+        )}
       </div>
     );
   }
