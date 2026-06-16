@@ -5,6 +5,7 @@ import { CloudOff, ArrowLeft, Search, ScanBarcode, ArrowDownAZ, Minus, Plus, Sen
 import { db, isFirebaseConfigured } from '../firebase';
 import { collection, doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { useToast } from './Toast';
+import { BarcodeScanner } from './BarcodeScanner';
 
 interface SugeridosViewProps {
   onNavigate: (view: ViewState, aisleNum?: number) => void;
@@ -91,6 +92,154 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
   const [productBrand, setProductBrand] = useState('');
   const [productSku, setProductSku] = useState('');
   const [productUndXCaja, setProductUndXCaja] = useState('0');
+
+  // Scanner States
+  const [showScanner, setShowScanner] = useState(false);
+  const [showGlobalScanner, setShowGlobalScanner] = useState(false);
+
+  // Global search states (when on main screen)
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [allProducts, setAllProducts] = useState<{ product: Product; aisle: Aisle }[]>([]);
+  const [loadingAllProducts, setLoadingAllProducts] = useState(false);
+
+  const fetchAllProducts = async () => {
+    if (allProducts.length > 0 || loadingAllProducts) return;
+    setLoadingAllProducts(true);
+    try {
+      if (isFirebaseConfigured) {
+        const { collection, getDocs } = await import('firebase/firestore');
+        const promises = aisles.map(async (aisle) => {
+          const productsRef = collection(db, 'aisles', aisle.id, 'products');
+          const snap = await getDocs(productsRef);
+          return snap.docs.map(doc => ({
+            product: { id: doc.id, ...doc.data() } as Product,
+            aisle
+          }));
+        });
+        const results = await Promise.all(promises);
+        setAllProducts(results.flat());
+      } else {
+        const list: { product: Product; aisle: Aisle }[] = [];
+        aisles.forEach(aisle => {
+          const freshProducts = mockProductsByAisle[aisle.number] || [];
+          const productsWithLocalData = freshProducts.map(p => {
+            const localSku = localStorage.getItem(`saman_sku_${p.id}`);
+            const localVal = localStorage.getItem(`saman_und_x_caja_${p.id}`);
+            return {
+              ...p,
+              sku: localSku !== null ? localSku : p.sku,
+              und_x_caja: localVal !== null ? parseInt(localVal, 10) : p.und_x_caja
+            };
+          });
+          productsWithLocalData.forEach(p => {
+            list.push({ product: p, aisle });
+          });
+        });
+        setAllProducts(list);
+      }
+    } catch (e) {
+      console.error("Error fetching all products:", e);
+      toast.error("Error al cargar la lista de productos.");
+    } finally {
+      setLoadingAllProducts(false);
+    }
+  };
+
+  const handleGlobalSearchChange = (val: string) => {
+    setGlobalSearchQuery(val);
+    fetchAllProducts();
+  };
+
+  const handleSelectProductResult = (item: { product: Product; aisle: Aisle }) => {
+    setSelectedAisle(item.aisle);
+    setSearchQuery(item.product.sku || item.product.name);
+    window.history.pushState({ view: 'sugeridos', selectedAisleNum: item.aisle.number }, '');
+  };
+
+  const handleScanResult = (code: string) => {
+    setShowScanner(false);
+    const cleanCode = code.trim().toLowerCase();
+    const existingProduct = products.find(p => p.sku && p.sku.trim().toLowerCase() === cleanCode);
+
+    if (existingProduct) {
+      setSearchQuery(existingProduct.sku || existingProduct.name);
+      toast.success(`Producto encontrado: ${existingProduct.name}`);
+    } else {
+      setProductName('');
+      setProductBrand('');
+      setProductSku(code);
+      setProductUndXCaja('0');
+      setShowProductModal(true);
+      toast.info('Producto no registrado en este pasillo.');
+    }
+  };
+
+  const handleGlobalScanResult = async (code: string) => {
+    setShowGlobalScanner(false);
+    const cleanCode = code.trim().toLowerCase();
+    
+    toast.info("Buscando producto...");
+    let list = allProducts;
+    if (list.length === 0) {
+      try {
+        if (isFirebaseConfigured) {
+          const { collection, getDocs } = await import('firebase/firestore');
+          const promises = aisles.map(async (aisle) => {
+            const productsRef = collection(db, 'aisles', aisle.id, 'products');
+            const snap = await getDocs(productsRef);
+            return snap.docs.map(doc => ({
+              product: { id: doc.id, ...doc.data() } as Product,
+              aisle
+            }));
+          });
+          const results = await Promise.all(promises);
+          list = results.flat();
+          setAllProducts(list);
+        } else {
+          const demoList: { product: Product; aisle: Aisle }[] = [];
+          aisles.forEach(aisle => {
+            const freshProducts = mockProductsByAisle[aisle.number] || [];
+            const productsWithLocalData = freshProducts.map(p => {
+              const localSku = localStorage.getItem(`saman_sku_${p.id}`);
+              const localVal = localStorage.getItem(`saman_und_x_caja_${p.id}`);
+              return {
+                ...p,
+                sku: localSku !== null ? localSku : p.sku,
+                und_x_caja: localVal !== null ? parseInt(localVal, 10) : p.und_x_caja
+              };
+            });
+            productsWithLocalData.forEach(p => {
+              demoList.push({ product: p, aisle });
+            });
+          });
+          list = demoList;
+          setAllProducts(list);
+        }
+      } catch (e) {
+        console.error("Error loading products on scan:", e);
+      }
+    }
+
+    const match = list.find(item => item.product.sku && item.product.sku.trim().toLowerCase() === cleanCode);
+    if (match) {
+      setSelectedAisle(match.aisle);
+      setSearchQuery(match.product.sku || match.product.name);
+      window.history.pushState({ view: 'sugeridos', selectedAisleNum: match.aisle.number }, '');
+      toast.success(`Producto encontrado en ${match.aisle.name}: ${match.product.name}`);
+    } else {
+      toast.error(`Producto con código "${code}" no encontrado en ningún pasillo.`);
+    }
+  };
+
+  const globalSearchResults = (allProducts || []).filter(item => {
+    const q = globalSearchQuery.trim().toLowerCase();
+    if (!q) return false;
+    return (
+      item.product.name.toLowerCase().includes(q) ||
+      item.product.brand.toLowerCase().includes(q) ||
+      (item.product.sku && item.product.sku.toLowerCase().includes(q))
+    );
+  });
 
   const isOperator = user?.role === 'operador';
   const displayedAisles = isOperator
@@ -421,6 +570,79 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
           <p className="font-sans text-[16px] md:text-[18px] text-on-surface-variant mt-2">Selecciona un pasillo para detallar el estado y colocar las sugerencias de compra.</p>
         </header>
 
+        {/* Search across all aisles */}
+        <div className="relative mb-6">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-on-surface-variant">
+            <Search size={20} />
+          </div>
+          <input 
+            type="text" 
+            placeholder="Buscar producto o escanear en todos los pasillos..." 
+            value={globalSearchQuery}
+            onChange={(e) => handleGlobalSearchChange(e.target.value)}
+            onFocus={fetchAllProducts}
+            className="w-full bg-white border border-outline-variant/50 rounded-full py-3 pl-12 pr-12 font-sans text-[16px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+          />
+          <button
+            onClick={() => {
+              fetchAllProducts();
+              setShowGlobalScanner(true);
+            }}
+            className="absolute inset-y-0 right-0 pr-4 flex items-center text-primary hover:text-primary/70 transition-colors cursor-pointer"
+            title="Escanear código de barra"
+          >
+            <ScanBarcode size={24} />
+          </button>
+        </div>
+
+        {/* Global Search Results */}
+        {globalSearchQuery && (
+          <div className="flex flex-col gap-3 max-w-4xl mx-auto w-full mb-8 animate-in fade-in duration-300">
+            <div className="flex justify-between items-center py-1 px-2 border-b border-outline-variant/20 pb-2">
+              <h3 className="font-mono text-[13px] font-medium text-on-surface-variant uppercase tracking-wider">
+                Resultados de Búsqueda ({globalSearchResults.length})
+              </h3>
+              <button 
+                onClick={() => setGlobalSearchQuery('')} 
+                className="text-primary font-mono text-[13px] font-semibold hover:underline cursor-pointer"
+              >
+                Limpiar
+              </button>
+            </div>
+
+            {loadingAllProducts && globalSearchResults.length === 0 ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-on-surface-variant font-mono text-[14px]">
+                <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                Cargando base de datos...
+              </div>
+            ) : globalSearchResults.length === 0 ? (
+              <div className="text-center py-8 text-on-surface-variant font-sans text-[15px]">
+                No se encontraron productos coincidentes.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 max-h-[350px] overflow-y-auto pr-1">
+                {globalSearchResults.map(({ product, aisle }) => (
+                  <button
+                    key={product.id}
+                    onClick={() => handleSelectProductResult({ product, aisle })}
+                    className="w-full text-left bg-card-surface hover:bg-surface-variant/40 rounded-2xl p-3 border border-outline-variant/20 flex items-center gap-3 transition-colors cursor-pointer"
+                  >
+                    <div className="w-12 h-12 rounded-lg bg-white border border-outline-variant/30 flex items-center justify-center flex-shrink-0 font-sans text-[16px] font-bold text-on-surface-variant/40">
+                      {product.initials}
+                    </div>
+                    <div className="flex-grow min-w-0">
+                      <h4 className="font-sans text-[15px] font-semibold text-on-surface truncate">{product.name}</h4>
+                      <p className="font-mono text-[12px] text-[#4f6b53] truncate">
+                        {product.brand} • SKU: {product.sku || 'N/A'} • {aisle.name}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {displayedAisles.length === 0 ? (
           <div className="bg-card-surface rounded-[32px] p-12 text-center border border-outline-variant/30 flex flex-col items-center justify-center max-w-xl mx-auto shadow-sm mt-8">
             <div className="bg-primary/10 text-primary p-4 rounded-full mb-4">
@@ -554,7 +776,11 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full bg-white border border-outline-variant/50 rounded-full py-3 pl-12 pr-12 font-sans text-[16px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
         />
-        <button className="absolute inset-y-0 right-0 pr-4 flex items-center text-primary">
+        <button 
+          onClick={() => setShowScanner(true)}
+          className="absolute inset-y-0 right-0 pr-4 flex items-center text-primary hover:text-primary/70 transition-colors cursor-pointer"
+          title="Escanear código de barra"
+        >
           <ScanBarcode size={24} />
         </button>
       </div>
@@ -888,6 +1114,20 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
             </form>
           </div>
         </div>
+      )}
+
+      {showScanner && (
+        <BarcodeScanner
+          onScan={handleScanResult}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
+
+      {showGlobalScanner && (
+        <BarcodeScanner
+          onScan={handleGlobalScanResult}
+          onClose={() => setShowGlobalScanner(false)}
+        />
       )}
     </div>
   );

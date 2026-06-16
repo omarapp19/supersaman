@@ -56,12 +56,20 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
 
   const handleScanResult = (code: string) => {
     setShowScanner(false);
-    // Pre-fill SKU and open product modal
-    setProductName('');
-    setProductBrand('');
-    setProductSku(code);
-    setProductUndXCaja('0');
-    setShowProductModal(true);
+    const cleanCode = code.trim().toLowerCase();
+    const existingProduct = products.find(p => p.sku && p.sku.trim().toLowerCase() === cleanCode);
+
+    if (existingProduct) {
+      setSearchQuery(existingProduct.sku || existingProduct.name);
+      toast.success(`Producto encontrado: ${existingProduct.name}`);
+    } else {
+      setProductName('');
+      setProductBrand('');
+      setProductSku(code);
+      setProductUndXCaja('0');
+      setShowProductModal(true);
+      toast.info('Producto no registrado en este pasillo.');
+    }
   };
 
   const handleDeleteProduct = async (product: Product) => {

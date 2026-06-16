@@ -18,8 +18,13 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
   const controlsRef = useRef<{ stop: () => void } | null>(null);
 
   useEffect(() => {
-    BrowserMultiFormatReader.listVideoInputDevices()
-      .then((devices) => {
+    const initCameras = async () => {
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          // Request camera permission first so labels are accessible
+          await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        }
+        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
         if (devices.length === 0) {
           setError('No se encontró ninguna cámara en este dispositivo.');
           return;
@@ -29,38 +34,84 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
           /back|rear|environment/i.test(a.label) ? -1 : 1
         );
         setCameras(sorted);
-      })
-      .catch(() => setError('No se pudo acceder a la cámara. Verifica los permisos.'));
+      } catch (err) {
+        console.error('Error listing cameras:', err);
+        setError('No se pudo acceder a la cámara. Verifica los permisos de la aplicación.');
+      }
+    };
+
+    initCameras();
   }, []);
 
   useEffect(() => {
     if (cameras.length === 0 || !videoRef.current) return;
 
-    // Stop previous session
-    controlsRef.current?.stop();
-    readerRef.current = new BrowserMultiFormatReader();
+    let active = true;
+    let controls: any = null;
+
+    // Stop previous session if it exists
+    if (controlsRef.current) {
+      try {
+        controlsRef.current.stop();
+      } catch (e) {
+        console.warn('Error stopping previous camera session:', e);
+      }
+      controlsRef.current = null;
+    }
+
+    const reader = new BrowserMultiFormatReader();
+    readerRef.current = reader;
     setScanning(true);
 
     const deviceId = cameras[cameraIndex]?.deviceId;
 
-    readerRef.current
+    reader
       .decodeFromVideoDevice(deviceId, videoRef.current, (result, err) => {
+        if (!active) return;
         if (result) {
           setScanning(false);
-          controlsRef.current?.stop();
+          if (controls) {
+            controls.stop();
+          } else {
+            active = false;
+          }
           onScan(result.getText());
         }
         if (err && !(err instanceof NotFoundException)) {
           console.warn('Scan error:', err);
         }
       })
-      .then((controls) => {
-        controlsRef.current = controls;
+      .then((c) => {
+        if (!active) {
+          c.stop();
+        } else {
+          controls = c;
+          controlsRef.current = c;
+        }
       })
-      .catch(() => setError('No se pudo iniciar la cámara. Verifica los permisos del navegador.'));
+      .catch((err) => {
+        if (active) {
+          console.error('Error starting video decode:', err);
+          setError('No se pudo iniciar la cámara. Verifica los permisos del navegador.');
+        }
+      });
 
     return () => {
-      controlsRef.current?.stop();
+      active = false;
+      if (controls) {
+        try {
+          controls.stop();
+        } catch (e) {
+          console.warn('Error stopping controls in cleanup:', e);
+        }
+      }
+      if (controlsRef.current) {
+        try {
+          controlsRef.current.stop();
+        } catch (e) {
+          console.warn('Error stopping controlsRef in cleanup:', e);
+        }
+      }
     };
   }, [cameras, cameraIndex]);
 
