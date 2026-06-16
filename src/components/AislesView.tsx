@@ -1,6 +1,10 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, useMemo, FormEvent } from 'react';
 import { ViewState, Aisle } from '../types';
-import { ClipboardList, Wine, Coffee, Milk, Plus, X, Trash2 } from 'lucide-react';
+import { ClipboardList, Wine, Coffee, Milk, Plus, X, Trash2, Search, ScanBarcode } from 'lucide-react';
+import { BarcodeScanner } from './BarcodeScanner';
+import { useToast } from './Toast';
+import { db, isFirebaseConfigured } from '../firebase';
+import { mockProductsByAisle } from '../data';
 
 interface AislesViewProps {
   onNavigate: (view: ViewState, aisleNum?: number) => void;
@@ -19,6 +23,165 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle, user
   const [error, setError] = useState<string | null>(null);
 
   const isOperator = user?.role === 'operador';
+
+  const toast = useToast();
+
+  // Search & Scanner States
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [allProducts, setAllProducts] = useState<{ product: any; aisle: Aisle }[]>([]);
+  const [loadingAllProducts, setLoadingAllProducts] = useState(false);
+  const [showGlobalScanner, setShowGlobalScanner] = useState(false);
+
+  const fetchAllProducts = async () => {
+    if (allProducts.length > 0 || loadingAllProducts) return;
+    setLoadingAllProducts(true);
+    try {
+      if (isFirebaseConfigured) {
+        const { collection, getDocs } = await import('firebase/firestore');
+        const promises = aisles.map(async (aisle) => {
+          const productsRef = collection(db, 'aisles', aisle.id, 'products');
+          const snap = await getDocs(productsRef);
+          return snap.docs.map(doc => ({
+            product: { id: doc.id, ...doc.data() },
+            aisle
+          }));
+        });
+        const results = await Promise.all(promises);
+        setAllProducts(results.flat());
+      } else {
+        const list: { product: any; aisle: Aisle }[] = [];
+        aisles.forEach(aisle => {
+          const freshProducts = mockProductsByAisle[aisle.number] || [];
+          const productsWithLocalData = freshProducts.map(p => {
+            const localSku = localStorage.getItem(`saman_sku_${p.id}`);
+            const localVal = localStorage.getItem(`saman_und_x_caja_${p.id}`);
+            return {
+              ...p,
+              sku: localSku !== null ? localSku : p.sku,
+              und_x_caja: localVal !== null ? parseInt(localVal, 10) : p.und_x_caja
+            };
+          });
+          productsWithLocalData.forEach(p => {
+            list.push({ product: p, aisle });
+          });
+        });
+        setAllProducts(list);
+      }
+    } catch (e) {
+      console.error("Error loading products in AislesView:", e);
+      toast.error("Error al cargar la lista de productos.");
+    } finally {
+      setLoadingAllProducts(false);
+    }
+  };
+
+  const handleGlobalSearchChange = (val: string) => {
+    setGlobalSearchQuery(val);
+    fetchAllProducts();
+  };
+
+  const handleSelectProductResult = (item: { product: any; aisle: Aisle }) => {
+    const aisle = item.aisle;
+    const isAisleAssignedToMe = !isOperator || (user?.assignedAisles && user.assignedAisles.includes(aisle.number));
+
+    if (isAisleAssignedToMe) {
+      onNavigate('pasillo-detail', aisle.number);
+    } else {
+      const assignedOps = users.filter(u => 
+        u.role === 'operador' && 
+        u.assignedAisles && 
+        u.assignedAisles.includes(aisle.number)
+      );
+      const names = assignedOps.map(o => o.fullName).join(', ');
+      if (names) {
+        toast.error(`Este producto lo tiene asignado ${names} en el Pasillo ${aisle.number} (${aisle.name}).`);
+      } else {
+        toast.error(`Este producto está en el Pasillo ${aisle.number} (${aisle.name}), el cual no tienes asignado.`);
+      }
+    }
+  };
+
+  const handleGlobalScanResult = async (code: string) => {
+    setShowGlobalScanner(false);
+    const cleanCode = code.trim().toLowerCase();
+    
+    toast.info("Buscando producto...");
+    let list = allProducts;
+    if (list.length === 0) {
+      try {
+        if (isFirebaseConfigured) {
+          const { collection, getDocs } = await import('firebase/firestore');
+          const promises = aisles.map(async (aisle) => {
+            const productsRef = collection(db, 'aisles', aisle.id, 'products');
+            const snap = await getDocs(productsRef);
+            return snap.docs.map(doc => ({
+              product: { id: doc.id, ...doc.data() },
+              aisle
+            }));
+          });
+          const results = await Promise.all(promises);
+          list = results.flat();
+          setAllProducts(list);
+        } else {
+          const demoList: { product: any; aisle: Aisle }[] = [];
+          aisles.forEach(aisle => {
+            const freshProducts = mockProductsByAisle[aisle.number] || [];
+            const productsWithLocalData = freshProducts.map(p => {
+              const localSku = localStorage.getItem(`saman_sku_${p.id}`);
+              const localVal = localStorage.getItem(`saman_und_x_caja_${p.id}`);
+              return {
+                ...p,
+                sku: localSku !== null ? localSku : p.sku,
+                und_x_caja: localVal !== null ? parseInt(localVal, 10) : p.und_x_caja
+              };
+            });
+            productsWithLocalData.forEach(p => {
+              demoList.push({ product: p, aisle });
+            });
+          });
+          list = demoList;
+          setAllProducts(list);
+        }
+      } catch (e) {
+        console.error("Error loading products on scan:", e);
+      }
+    }
+
+    const match = list.find(item => item.product.sku && item.product.sku.trim().toLowerCase() === cleanCode);
+    if (match) {
+      const aisle = match.aisle;
+      const isAisleAssignedToMe = !isOperator || (user?.assignedAisles && user.assignedAisles.includes(aisle.number));
+
+      if (isAisleAssignedToMe) {
+        onNavigate('pasillo-detail', aisle.number);
+        toast.success(`Producto encontrado en tu pasillo (${aisle.name}): ${match.product.name}`);
+      } else {
+        const assignedOps = users.filter(u => 
+          u.role === 'operador' && 
+          u.assignedAisles && 
+          u.assignedAisles.includes(aisle.number)
+        );
+        const names = assignedOps.map(o => o.fullName).join(', ');
+        if (names) {
+          toast.error(`Este producto lo tiene asignado ${names} en el Pasillo ${aisle.number} (${aisle.name}).`);
+        } else {
+          toast.error(`Este producto está en el Pasillo ${aisle.number} (${aisle.name}), el cual no tienes asignado.`);
+        }
+      }
+    } else {
+      toast.error(`Producto con código "${code}" no encontrado en ningún pasillo.`);
+    }
+  };
+
+  const globalSearchResults = useMemo(() => {
+    const q = globalSearchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return allProducts.filter(item => 
+      item.product.name.toLowerCase().includes(q) ||
+      item.product.brand.toLowerCase().includes(q) ||
+      (item.product.sku && item.product.sku.toLowerCase().includes(q))
+    );
+  }, [globalSearchQuery, allProducts]);
   
   const displayedAisles = isOperator
     ? aisles.filter(a => user?.assignedAisles?.includes(a.number))
@@ -74,6 +237,105 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle, user
           </button>
         )}
       </section>
+
+      {/* Search across all aisles */}
+      <div className="relative mb-6">
+        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-on-surface-variant">
+          <Search size={20} />
+        </div>
+        <input 
+          type="text" 
+          placeholder="Buscar producto o escanear en todos los pasillos..." 
+          value={globalSearchQuery}
+          onChange={(e) => handleGlobalSearchChange(e.target.value)}
+          onFocus={fetchAllProducts}
+          className="w-full bg-white border border-outline-variant/50 rounded-full py-3 pl-12 pr-12 font-sans text-[16px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+        />
+        <button
+          onClick={() => {
+            fetchAllProducts();
+            setShowGlobalScanner(true);
+          }}
+          className="absolute inset-y-0 right-0 pr-4 flex items-center text-primary hover:text-primary/70 transition-colors cursor-pointer"
+          title="Escanear código de barra"
+        >
+          <ScanBarcode size={24} />
+        </button>
+      </div>
+
+      {/* Global Search Results */}
+      {globalSearchQuery && (
+        <div className="flex flex-col gap-3 max-w-4xl mx-auto w-full mb-8 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center py-1 px-2 border-b border-outline-variant/20 pb-2">
+            <h3 className="font-mono text-[13px] font-medium text-on-surface-variant uppercase tracking-wider">
+              Resultados de Búsqueda ({globalSearchResults.length})
+            </h3>
+            <button 
+              onClick={() => setGlobalSearchQuery('')} 
+              className="text-primary font-mono text-[13px] font-semibold hover:underline cursor-pointer"
+            >
+              Limpiar
+            </button>
+          </div>
+
+          {loadingAllProducts && globalSearchResults.length === 0 ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-on-surface-variant font-mono text-[14px]">
+              <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              Cargando base de datos...
+            </div>
+          ) : globalSearchResults.length === 0 ? (
+            <div className="text-center py-8 text-on-surface-variant font-sans text-[15px]">
+              No se encontraron productos coincidentes.
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2 max-h-[350px] overflow-y-auto pr-1">
+              {globalSearchResults.map(({ product, aisle }) => {
+                const isAisleAssignedToMe = !isOperator || (user?.assignedAisles && user.assignedAisles.includes(aisle.number));
+                const assignedOps = users.filter(u => 
+                  u.role === 'operador' && 
+                  u.assignedAisles && 
+                  u.assignedAisles.includes(aisle.number)
+                );
+                const assignedToNames = assignedOps.map(o => o.fullName).join(', ');
+
+                return (
+                  <button
+                    key={product.id}
+                    onClick={() => handleSelectProductResult({ product, aisle })}
+                    className={`w-full text-left rounded-2xl p-3 border flex items-center gap-3 transition-all cursor-pointer ${
+                      isAisleAssignedToMe 
+                        ? 'bg-card-surface hover:bg-surface-variant/40 border-outline-variant/20' 
+                        : 'bg-red-50/20 border-red-200/50 hover:bg-red-50/40'
+                    }`}
+                  >
+                    <div className="w-12 h-12 rounded-lg bg-white border border-outline-variant/30 flex items-center justify-center flex-shrink-0 font-sans text-[16px] font-bold text-on-surface-variant/40">
+                      {product.initials}
+                    </div>
+                    <div className="flex-grow min-w-0">
+                      <h4 className="font-sans text-[15px] font-semibold text-on-surface truncate">{product.name}</h4>
+                      <p className="font-mono text-[12px] text-[#4f6b53] truncate">
+                        {product.brand} • SKU: {product.sku || 'N/A'} • {aisle.name}
+                      </p>
+                    </div>
+                    
+                    <div className="flex-shrink-0 pr-1">
+                      {isAisleAssignedToMe ? (
+                        <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-full font-sans text-[11px] font-bold uppercase tracking-wider">
+                          Tu pasillo
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 bg-rose-500/10 text-rose-700 border border-rose-500/20 rounded-full font-sans text-[11px] font-bold uppercase tracking-wider" title={assignedToNames ? `Asignado a: ${assignedToNames}` : 'Sin operador asignado'}>
+                          {assignedToNames ? `Asignado a: ${assignedToNames.split(' ')[0]}` : 'No asignado'}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {displayedAisles.length === 0 ? (
         <div className="bg-card-surface rounded-[32px] p-12 text-center border border-outline-variant/30 flex flex-col items-center justify-center max-w-xl mx-auto shadow-sm mt-8 animate-in fade-in duration-300">
@@ -263,6 +525,13 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle, user
             </div>
           </div>
         </div>
+      )}
+
+      {showGlobalScanner && (
+        <BarcodeScanner
+          onScan={handleGlobalScanResult}
+          onClose={() => setShowGlobalScanner(false)}
+        />
       )}
     </div>
   );
