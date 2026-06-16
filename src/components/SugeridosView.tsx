@@ -104,20 +104,29 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
 
   const fetchAllProducts = async () => {
     if (allProducts.length > 0 || loadingAllProducts) return;
+
+    if (typeof window !== 'undefined' && (window as any).__samanProductsCache) {
+      setAllProducts((window as any).__samanProductsCache);
+      return;
+    }
+
     setLoadingAllProducts(true);
     try {
       if (isFirebaseConfigured) {
-        const { collection, getDocs } = await import('firebase/firestore');
-        const promises = aisles.map(async (aisle) => {
-          const productsRef = collection(db, 'aisles', aisle.id, 'products');
-          const snap = await getDocs(productsRef);
-          return snap.docs.map(doc => ({
-            product: { id: doc.id, ...doc.data() } as Product,
-            aisle
-          }));
-        });
-        const results = await Promise.all(promises);
-        setAllProducts(results.flat());
+        const { collectionGroup, getDocs } = await import('firebase/firestore');
+        const snap = await getDocs(collectionGroup(db, 'products'));
+        const list = snap.docs.map(docSnap => {
+          const productData = { id: docSnap.id, ...docSnap.data() } as Product;
+          const pathSegments = docSnap.ref.path.split('/');
+          const aisleId = pathSegments[1];
+          const aisle = aisles.find(a => a.id === aisleId);
+          return { product: productData, aisle };
+        }).filter(item => item.aisle !== undefined) as { product: Product; aisle: Aisle }[];
+
+        if (typeof window !== 'undefined') {
+          (window as any).__samanProductsCache = list;
+        }
+        setAllProducts(list);
       } else {
         const list: { product: Product; aisle: Aisle }[] = [];
         aisles.forEach(aisle => {
@@ -135,6 +144,9 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
             list.push({ product: p, aisle });
           });
         });
+        if (typeof window !== 'undefined') {
+          (window as any).__samanProductsCache = list;
+        }
         setAllProducts(list);
       }
     } catch (e) {
@@ -398,6 +410,9 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
         localStorage.setItem(`saman_sku_${productId}`, sku);
         localStorage.setItem(`saman_und_x_caja_${productId}`, String(und_x_caja));
       }
+      if (typeof window !== 'undefined') {
+        (window as any).__samanProductsCache = null;
+      }
       toast.success('Producto actualizado.');
       setEditingProductId(null);
     } catch (error) {
@@ -437,6 +452,9 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
         if (und_x_caja > 0) {
           localStorage.setItem(`saman_und_x_caja_${newProduct.id}`, String(und_x_caja));
         }
+      }
+      if (typeof window !== 'undefined') {
+        (window as any).__samanProductsCache = null;
       }
       toast.success('Producto agregado con éxito.');
       setShowProductModal(false);

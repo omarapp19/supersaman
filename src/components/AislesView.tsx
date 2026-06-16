@@ -34,20 +34,29 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle, user
 
   const fetchAllProducts = async () => {
     if (allProducts.length > 0 || loadingAllProducts) return;
+
+    if (typeof window !== 'undefined' && (window as any).__samanProductsCache) {
+      setAllProducts((window as any).__samanProductsCache);
+      return;
+    }
+
     setLoadingAllProducts(true);
     try {
       if (isFirebaseConfigured) {
-        const { collection, getDocs } = await import('firebase/firestore');
-        const promises = aisles.map(async (aisle) => {
-          const productsRef = collection(db, 'aisles', aisle.id, 'products');
-          const snap = await getDocs(productsRef);
-          return snap.docs.map(doc => ({
-            product: { id: doc.id, ...doc.data() },
-            aisle
-          }));
-        });
-        const results = await Promise.all(promises);
-        setAllProducts(results.flat());
+        const { collectionGroup, getDocs } = await import('firebase/firestore');
+        const snap = await getDocs(collectionGroup(db, 'products'));
+        const list = snap.docs.map(docSnap => {
+          const productData = { id: docSnap.id, ...docSnap.data() };
+          const pathSegments = docSnap.ref.path.split('/');
+          const aisleId = pathSegments[1];
+          const aisle = aisles.find(a => a.id === aisleId);
+          return { product: productData, aisle };
+        }).filter(item => item.aisle !== undefined) as { product: any; aisle: Aisle }[];
+
+        if (typeof window !== 'undefined') {
+          (window as any).__samanProductsCache = list;
+        }
+        setAllProducts(list);
       } else {
         const list: { product: any; aisle: Aisle }[] = [];
         aisles.forEach(aisle => {
@@ -65,6 +74,9 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle, user
             list.push({ product: p, aisle });
           });
         });
+        if (typeof window !== 'undefined') {
+          (window as any).__samanProductsCache = list;
+        }
         setAllProducts(list);
       }
     } catch (e) {

@@ -79,6 +79,9 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
       // Demo mode: update local state directly
       setProducts(prev => prev.filter(p => p.id !== product.id));
     }
+    if (typeof window !== 'undefined') {
+      (window as any).__samanProductsCache = null;
+    }
     setProductToDelete(null);
   };
 
@@ -96,6 +99,9 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
         setProducts(prev => prev.map(p => p.id === productId ? { ...p, sku, und_x_caja } : p));
         localStorage.setItem(`saman_sku_${productId}`, sku);
         localStorage.setItem(`saman_und_x_caja_${productId}`, String(und_x_caja));
+      }
+      if (typeof window !== 'undefined') {
+        (window as any).__samanProductsCache = null;
       }
       toast.success('Producto actualizado.');
       setEditingProductId(null);
@@ -148,6 +154,9 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
         }
       }
 
+      if (typeof window !== 'undefined') {
+        (window as any).__samanProductsCache = null;
+      }
       toast.success('Producto agregado con éxito.');
       setShowProductModal(false);
     } catch (error) {
