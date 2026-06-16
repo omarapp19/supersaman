@@ -150,7 +150,7 @@ export function Login({ onMockLogin }: LoginProps) {
       <div className="bg-card-surface/90 border border-outline-variant/30 backdrop-blur-md rounded-[32px] w-full max-w-md p-8 md:p-10 shadow-[0_20px_50px_rgba(40,28,25,0.08)] relative z-10 transition-all">
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center mb-8">
-          <img src="/logo.svg" alt="Súper Samán" className="w-28 h-28 mb-3 drop-shadow-md" />
+          <img src="/logo.svg" alt="Súper Samán" className="w-28 h-28 mb-3 drop-shadow-md mix-blend-multiply" />
           <p className="font-sans text-[14px] text-on-surface-variant mt-1">Ingresa al portal de administración de la sucursal</p>
         </div>
 

@@ -44,7 +44,7 @@ export function Sidebar({ currentView, onNavigate, onLogout, user }: SidebarProp
     <nav className="h-full w-64 left-0 fixed hidden md:flex flex-col bg-card-surface shadow-sm z-50 border-r border-outline-variant/20 print-hide">
       <div className="flex flex-col h-full p-4 gap-2">
         <div className="mb-6 px-2 pt-2 flex flex-col items-center">
-          <img src="/logo.svg" alt="Súper Samán" className="w-24 h-24 mb-3 drop-shadow-sm" />
+          <img src="/logo.svg" alt="Súper Samán" className="w-24 h-24 mb-3 drop-shadow-sm mix-blend-multiply" />
           <div className="flex items-center gap-3 bg-surface-variant/30 p-2.5 rounded-2xl w-full border border-outline-variant/10">
             <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold flex-shrink-0 text-[14px]">
               {getInitials()}

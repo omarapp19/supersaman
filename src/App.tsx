@@ -353,7 +353,7 @@ function AppContent() {
         {/* Ambient background blur */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] rounded-full bg-primary/15 blur-3xl animate-pulse"></div>
         <div className="flex flex-col items-center gap-4 relative z-10 animate-pulse">
-          <img src="/logo.svg" alt="Súper Samán" className="w-24 h-24 mb-2" />
+          <img src="/logo.svg" alt="Súper Samán" className="w-24 h-24 mb-2 mix-blend-multiply" />
           <div className="flex items-center gap-3">
             <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
             <span className="font-mono text-[13px] text-on-surface-variant font-semibold tracking-wider uppercase">Cargando Súper Samán...</span>
@@ -375,7 +375,7 @@ function AppContent() {
       {/* Mobile Top App Bar (Only visible when not in Pasillo Detail which has its own header) */}
       {currentView !== 'pasillo-detail' && (
         <header className="flex justify-between items-center w-full px-4 py-2 md:hidden bg-card-surface/90 backdrop-blur-md sticky top-0 z-40 mb-4 print-hide border-b border-outline-variant/20">
-          <img src="/logo.svg" alt="Súper Samán" className="h-12 w-12" />
+          <img src="/logo.svg" alt="Súper Samán" className="h-12 w-12 mix-blend-multiply" />
           <div className="flex gap-4 text-primary">
             <button 
               className="active:scale-95 transition-transform cursor-pointer"
