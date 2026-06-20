@@ -374,7 +374,7 @@ function AppContent() {
       
       {/* Mobile Top App Bar (Only visible when not in Pasillo Detail which has its own header) */}
       {currentView !== 'pasillo-detail' && (
-        <header className="flex justify-between items-center w-full px-4 py-2 md:hidden bg-card-surface/90 backdrop-blur-md sticky top-0 z-40 mb-4 print-hide border-b border-outline-variant/20">
+        <header className="flex justify-between items-center w-full px-4 py-2 md:hidden bg-card-surface sticky top-0 z-40 mb-4 print-hide border-b border-outline-variant/20">
           <img src="/logo.svg" alt="Súper Samán" className="h-12 w-12 mix-blend-multiply" />
           <div className="flex gap-4 text-primary">
             <button 

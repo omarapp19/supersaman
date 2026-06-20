@@ -11,7 +11,7 @@ export function BottomNav({ currentView, onNavigate, user }: BottomNavProps) {
   const isOperator = user?.role === 'operador';
 
   return (
-    <nav className="bg-surface/90 shadow-[0_-4px_20px_rgba(40,28,25,0.05)] backdrop-blur-xl fixed bottom-0 left-0 w-full rounded-t-3xl md:hidden z-50 flex justify-around items-center px-4 pt-2 pb-6 print-hide border-t border-white/20">
+    <nav className="bg-surface/95 shadow-[0_-4px_20px_rgba(40,28,25,0.05)] fixed bottom-0 left-0 w-full rounded-t-3xl md:hidden z-50 flex justify-around items-center px-4 pt-2 pb-6 print-hide border-t border-white/20">
       <NavItem 
         active={currentView === 'pasillos' || currentView === 'pasillo-detail'} 
         icon={LayoutGrid} 
