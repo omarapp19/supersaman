@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useMemo } from 'react';
 import { ViewState, Product, Aisle } from '../types';
 import { mockProductsByAisle, mockAisles } from '../data';
 import { CloudOff, ArrowLeft, Search, ScanBarcode, ArrowDownAZ, Minus, Plus, Send, AlertTriangle, Lightbulb, Pencil, X, Trash2 } from 'lucide-react';
@@ -101,6 +101,40 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
   const [productUndXCaja, setProductUndXCaja] = useState('0');
   const [productCompany, setProductCompany] = useState('');
 
+  // Computamos las empresas únicas para el autocompletado (datalist)
+  const uniqueCompanies = useMemo(() => {
+    const companies = new Set<string>();
+    
+    // 1. Agregar empresas de los productos cargados del pasillo actual
+    products.forEach(p => {
+      if (p.company?.trim()) {
+        companies.add(p.company.trim());
+      }
+    });
+
+    // 2. Agregar empresas de todos los productos (si ya se cargó la caché)
+    allProducts.forEach(item => {
+      if (item.product.company?.trim()) {
+        companies.add(item.product.company.trim());
+      }
+    });
+
+    // 3. Agregar empresas de los datos mock en modo demo
+    if (!isFirebaseConfigured) {
+      Object.values(mockProductsByAisle).forEach(prodList => {
+        prodList.forEach(p => {
+          const localCompany = localStorage.getItem(`saman_company_${p.id}`);
+          const company = localCompany !== null ? localCompany : p.company;
+          if (company?.trim()) {
+            companies.add(company.trim());
+          }
+        });
+      });
+    }
+
+    return Array.from(companies).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [products, allProducts]);
+
   // Scanner States
   const [showScanner, setShowScanner] = useState(false);
   const [showGlobalScanner, setShowGlobalScanner] = useState(false);
@@ -197,6 +231,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
       setProductUndXCaja('0');
       setProductCompany('');
       setShowProductModal(true);
+      fetchAllProducts(); // Carga las empresas en segundo plano
       toast.info('Producto no registrado en este pasillo.');
     }
   };
@@ -939,6 +974,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
                         <span className="font-mono text-[13px] text-[#4f6b53]">Empresa:</span>
                         <input
                           type="text"
+                          list="companies-list"
                           value={tempCompany}
                           onChange={(e) => setTempCompany(e.target.value)}
                           onKeyDown={(e) => {
@@ -976,6 +1012,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
                               setTempSku(product.sku || '');
                               setTempValue(String(product.und_x_caja ?? 0));
                               setTempCompany(product.company || '');
+                              fetchAllProducts(); // Carga las empresas en segundo plano
                             }}
                             className="text-primary hover:text-primary/70 transition-colors p-0.5 inline-flex items-center gap-0.5 cursor-pointer"
                             title="Editar producto"
@@ -1160,6 +1197,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
                 <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Empresa / Distribuidor</label>
                 <input 
                   type="text" 
+                  list="companies-list"
                   value={productCompany}
                   onChange={(e) => setProductCompany(e.target.value)}
                   placeholder="Ej. Alimentos Polar"
@@ -1213,6 +1251,13 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
           onClose={() => setShowGlobalScanner(false)}
         />
       )}
+
+      {/* Datalist global para autocompletado de empresas */}
+      <datalist id="companies-list">
+        {uniqueCompanies.map(c => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
     </div>
   );
 }

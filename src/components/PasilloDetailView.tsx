@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useMemo } from 'react';
 import { ViewState, Product, Aisle } from '../types';
 import { mockProductsByAisle, mockAisles } from '../data';
 import { CloudOff, ArrowLeft, MoreVertical, Search, ScanBarcode, ArrowDownAZ, Plus, X, Trash2, Pencil } from 'lucide-react';
@@ -56,6 +56,105 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
   const [productCompany, setProductCompany] = useState('');
   const [showScanner, setShowScanner] = useState(false);
 
+  // Estados para cargar todos los productos en caché y obtener sus empresas
+  const [allProducts, setAllProducts] = useState<{ product: Product; aisle: Aisle }[]>([]);
+  const [loadingAllProducts, setLoadingAllProducts] = useState(false);
+
+  const fetchAllProducts = async () => {
+    if (allProducts.length > 0 || loadingAllProducts) return;
+
+    if (typeof window !== 'undefined' && (window as any).__samanProductsCache) {
+      setAllProducts((window as any).__samanProductsCache);
+      return;
+    }
+
+    setLoadingAllProducts(true);
+    try {
+      if (isFirebaseConfigured) {
+        const { collection, getDocs } = await import('firebase/firestore');
+        const promises = aisles.map(async (aisleItem) => {
+          const productsRef = collection(db, 'aisles', aisleItem.id, 'products');
+          const snap = await getDocs(productsRef);
+          return snap.docs.map(docSnap => ({
+            product: { id: docSnap.id, ...docSnap.data() } as Product,
+            aisle: aisleItem
+          }));
+        });
+        const results = await Promise.all(promises);
+        const list = results.flat();
+
+        if (typeof window !== 'undefined') {
+          (window as any).__samanProductsCache = list;
+        }
+        setAllProducts(list);
+      } else {
+        const list: { product: Product; aisle: Aisle }[] = [];
+        aisles.forEach(aisleItem => {
+          const freshProducts = mockProductsByAisle[aisleItem.number] || [];
+          const productsWithLocalData = freshProducts.map(p => {
+            const localSku = localStorage.getItem(`saman_sku_${p.id}`);
+            const localVal = localStorage.getItem(`saman_und_x_caja_${p.id}`);
+            const localCompany = localStorage.getItem(`saman_company_${p.id}`);
+            const localName = localStorage.getItem(`saman_name_${p.id}`);
+            return {
+              ...p,
+              name: localName !== null ? localName : p.name,
+              sku: localSku !== null ? localSku : p.sku,
+              und_x_caja: localVal !== null ? parseInt(localVal, 10) : p.und_x_caja,
+              company: localCompany !== null ? localCompany : p.company
+            };
+          });
+          productsWithLocalData.forEach(p => {
+            list.push({ product: p, aisle: aisleItem });
+          });
+        });
+        if (typeof window !== 'undefined') {
+          (window as any).__samanProductsCache = list;
+        }
+        setAllProducts(list);
+      }
+    } catch (e) {
+      console.error("Error fetching all products:", e);
+      toast.error("Error al cargar la lista de productos.");
+    } finally {
+      setLoadingAllProducts(false);
+    }
+  };
+
+  // Computamos las empresas únicas para el autocompletado (datalist)
+  const uniqueCompanies = useMemo(() => {
+    const companies = new Set<string>();
+    
+    // 1. Agregar empresas de los productos cargados del pasillo actual
+    products.forEach(p => {
+      if (p.company?.trim()) {
+        companies.add(p.company.trim());
+      }
+    });
+
+    // 2. Agregar empresas de todos los productos (si ya se cargó la caché)
+    allProducts.forEach(item => {
+      if (item.product.company?.trim()) {
+        companies.add(item.product.company.trim());
+      }
+    });
+
+    // 3. Agregar empresas de los datos mock en modo demo
+    if (!isFirebaseConfigured) {
+      Object.values(mockProductsByAisle).forEach(prodList => {
+        prodList.forEach(p => {
+          const localCompany = localStorage.getItem(`saman_company_${p.id}`);
+          const company = localCompany !== null ? localCompany : p.company;
+          if (company?.trim()) {
+            companies.add(company.trim());
+          }
+        });
+      });
+    }
+
+    return Array.from(companies).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [products, allProducts]);
+
   const handleScanResult = (code: string) => {
     setShowScanner(false);
     const cleanCode = code.trim().toLowerCase();
@@ -71,6 +170,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
       setProductUndXCaja('0');
       setProductCompany('');
       setShowProductModal(true);
+      fetchAllProducts(); // Carga las empresas en segundo plano
       toast.info('Producto no registrado en este pasillo.');
     }
   };
@@ -321,6 +421,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
               setProductUndXCaja('0');
               setProductCompany('');
               setShowProductModal(true);
+              fetchAllProducts(); // Carga las empresas en segundo plano
             }}
             className="flex items-center gap-1 text-primary font-mono text-[13px] font-semibold hover:bg-primary/5 px-3 py-1.5 rounded-full border border-primary/20 transition-colors cursor-pointer bg-white"
           >
@@ -430,6 +531,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                             <span className="font-mono text-[13px] text-[#4f6b53]">Empresa:</span>
                             <input
                               type="text"
+                              list="companies-list"
                               value={tempCompany}
                               onChange={(e) => setTempCompany(e.target.value)}
                               onKeyDown={(e) => {
@@ -467,6 +569,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                                   setTempSku(product.sku || '');
                                   setTempValue(String(product.und_x_caja ?? 0));
                                   setTempCompany(product.company || '');
+                                  fetchAllProducts(); // Carga las empresas en segundo plano
                                 }}
                                 className="text-primary hover:text-primary/70 transition-colors p-0.5 inline-flex items-center gap-0.5 cursor-pointer"
                                 title="Editar producto"
@@ -550,6 +653,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                 <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Empresa / Distribuidor</label>
                 <input 
                   type="text" 
+                  list="companies-list"
                   value={productCompany}
                   onChange={(e) => setProductCompany(e.target.value)}
                   placeholder="Ej. Alimentos Polar"
@@ -633,6 +737,13 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
           onClose={() => setShowScanner(false)}
         />
       )}
+
+      {/* Datalist global para autocompletado de empresas */}
+      <datalist id="companies-list">
+        {uniqueCompanies.map(c => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
     </div>
   );
 }

@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, Printer, ChevronDown, X, Store, CheckCircle2, Circle, CalendarDays, Package, ArrowUp, Pencil } from 'lucide-react';
 import { ViewState, OrderItem, Aisle } from '../types';
+import { isFirebaseConfigured } from '../firebase';
+import { mockProductsByAisle } from '../data';
 
 interface ComprasViewProps {
   orders: OrderItem[];
@@ -114,6 +116,43 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
   const [editProductName, setEditProductName] = useState('');
   const [editUndXCaja, setEditUndXCaja] = useState('0');
   const [editCompany, setEditCompany] = useState('');
+
+  // Computamos las empresas únicas para el autocompletado (datalist)
+  const uniqueCompanies = useMemo(() => {
+    const companies = new Set<string>();
+    
+    // 1. Agregar empresas de las órdenes activas en pantalla
+    orders.forEach(o => {
+      if (o.company?.trim()) {
+        companies.add(o.company.trim());
+      }
+    });
+
+    // 2. Agregar empresas de la caché global si existe
+    if (typeof window !== 'undefined' && (window as any).__samanProductsCache) {
+      const cache = (window as any).__samanProductsCache as { product: { company?: string } }[];
+      cache.forEach(item => {
+        if (item.product.company?.trim()) {
+          companies.add(item.product.company.trim());
+        }
+      });
+    }
+
+    // 3. Agregar empresas de los datos mock en modo demo
+    if (!isFirebaseConfigured) {
+      Object.values(mockProductsByAisle).forEach(prodList => {
+        prodList.forEach(p => {
+          const localCompany = localStorage.getItem(`saman_company_${p.id}`);
+          const company = localCompany !== null ? localCompany : p.company;
+          if (company?.trim()) {
+            companies.add(company.trim());
+          }
+        });
+      });
+    }
+
+    return Array.from(companies).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [orders]);
 
   const handleStartEdit = () => {
     if (!selectedOrder) return;
@@ -688,6 +727,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                                   <span className="font-sans text-[13px] font-medium text-on-surface-variant">Empresa:</span>
                                   <input
                                     type="text"
+                                    list="companies-list"
                                     value={tempCompany}
                                     onChange={(e) => setTempCompany(e.target.value)}
                                     placeholder="Empresa"
@@ -936,6 +976,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                     <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Empresa / Distribuidor</label>
                     <input 
                       type="text" 
+                      list="companies-list"
                       value={editCompany}
                       onChange={(e) => setEditCompany(e.target.value)}
                       placeholder="Ej. Alimentos Polar"
@@ -1163,6 +1204,13 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
           <ArrowUp size={22} strokeWidth={2.5} />
         </button>
       )}
+
+      {/* Datalist global para autocompletado de empresas */}
+      <datalist id="companies-list">
+        {uniqueCompanies.map(c => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
     </div>
   );
 }
