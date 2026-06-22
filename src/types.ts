@@ -34,5 +34,6 @@ export interface OrderItem {
   lastUpdated: string;
   checked?: boolean;
   company?: string;
+  und_x_caja?: number;
 }
 

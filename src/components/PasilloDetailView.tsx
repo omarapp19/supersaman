@@ -212,8 +212,10 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
         const localVal = localStorage.getItem(`saman_und_x_caja_${p.id}`);
         const localSku = localStorage.getItem(`saman_sku_${p.id}`);
         const localCompany = localStorage.getItem(`saman_company_${p.id}`);
+        const localName = localStorage.getItem(`saman_name_${p.id}`);
         return {
           ...p,
+          name: localName !== null ? localName : p.name,
           und_x_caja: localVal !== null ? parseInt(localVal, 10) : p.und_x_caja,
           sku: localSku !== null ? localSku : p.sku,
           company: localCompany !== null ? localCompany : p.company

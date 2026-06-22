@@ -24,6 +24,7 @@ interface DraftItem {
   aisleNumber: number;
   status: 'normal' | 'bajo' | 'crítico';
   company?: string;
+  und_x_caja?: number;
 }
 
 export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: SugeridosViewProps) {
@@ -55,6 +56,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
       const pAisle = selectedAisle?.number || currentItem?.aisleNumber || 0;
       const pStatus = product?.status || currentItem?.status || 'normal';
       const pCompany = product?.company || currentItem?.company || '';
+      const pUndXCaja = product?.und_x_caja !== undefined ? product.und_x_caja : currentItem?.und_x_caja;
 
       const updatedItem: DraftItem = {
         productId,
@@ -65,7 +67,8 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
         unit: updates.unit !== undefined ? updates.unit : (currentItem?.unit || 'und'),
         aisleNumber: pAisle,
         status: updates.status !== undefined ? updates.status : pStatus,
-        company: pCompany
+        company: pCompany,
+        und_x_caja: pUndXCaja
       };
 
       const next = { ...prev };
@@ -140,8 +143,10 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
             const localSku = localStorage.getItem(`saman_sku_${p.id}`);
             const localVal = localStorage.getItem(`saman_und_x_caja_${p.id}`);
             const localCompany = localStorage.getItem(`saman_company_${p.id}`);
+            const localName = localStorage.getItem(`saman_name_${p.id}`);
             return {
               ...p,
+              name: localName !== null ? localName : p.name,
               sku: localSku !== null ? localSku : p.sku,
               und_x_caja: localVal !== null ? parseInt(localVal, 10) : p.und_x_caja,
               company: localCompany !== null ? localCompany : p.company
@@ -222,10 +227,14 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
             const productsWithLocalData = freshProducts.map(p => {
               const localSku = localStorage.getItem(`saman_sku_${p.id}`);
               const localVal = localStorage.getItem(`saman_und_x_caja_${p.id}`);
+              const localCompany = localStorage.getItem(`saman_company_${p.id}`);
+              const localName = localStorage.getItem(`saman_name_${p.id}`);
               return {
                 ...p,
+                name: localName !== null ? localName : p.name,
                 sku: localSku !== null ? localSku : p.sku,
-                und_x_caja: localVal !== null ? parseInt(localVal, 10) : p.und_x_caja
+                und_x_caja: localVal !== null ? parseInt(localVal, 10) : p.und_x_caja,
+                company: localCompany !== null ? localCompany : p.company
               };
             });
             productsWithLocalData.forEach(p => {
@@ -377,8 +386,10 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
         const localVal = localStorage.getItem(`saman_und_x_caja_${p.id}`);
         const localSku = localStorage.getItem(`saman_sku_${p.id}`);
         const localCompany = localStorage.getItem(`saman_company_${p.id}`);
+        const localName = localStorage.getItem(`saman_name_${p.id}`);
         const base = {
           ...p,
+          name: localName !== null ? localName : p.name,
           und_x_caja: localVal !== null ? parseInt(localVal, 10) : p.und_x_caja,
           sku: localSku !== null ? localSku : p.sku,
           company: localCompany !== null ? localCompany : p.company
@@ -536,6 +547,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
         user: user?.displayName || user?.fullName || 'Operador',
         status: item.status,
         company: item.company || '',
+        und_x_caja: item.und_x_caja || 0,
         lastUpdated: now
       }));
 

@@ -76,6 +76,66 @@ function AppContent() {
     }
   };
 
+  const handleUpdateOrder = async (orderId: string, updates: any) => {
+    if (isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'orders', orderId), updates);
+      } catch (error) {
+        console.error("Error al actualizar pedido en Firestore:", error);
+        toast.error("Error al actualizar el pedido.");
+        return;
+      }
+    } else {
+      setOrders(prev => {
+        const updated = prev.map(o => o.id === orderId ? { ...o, ...updates } : o);
+        localStorage.setItem('saman_orders', JSON.stringify(updated));
+        return updated;
+      });
+    }
+
+    const parts = orderId.split('_');
+    const productId = parts.length > 2 ? parts.slice(2).join('_') : null;
+
+    if (productId) {
+      const order = orders.find(o => o.id === orderId);
+      const aisleNum = order ? order.aisle : updates.aisle;
+      
+      if (aisleNum !== undefined) {
+        const aisleObj = aisles.find(a => a.number === aisleNum);
+        if (aisleObj) {
+          const productUpdates: any = {};
+          if (updates.productName !== undefined) productUpdates.name = updates.productName;
+          if (updates.und_x_caja !== undefined) productUpdates.und_x_caja = updates.und_x_caja;
+          if (updates.company !== undefined) productUpdates.company = updates.company;
+
+          if (Object.keys(productUpdates).length > 0) {
+            if (isFirebaseConfigured) {
+              try {
+                await setDoc(doc(db, 'aisles', aisleObj.id, 'products', productId), productUpdates, { merge: true });
+              } catch (err) {
+                console.error("Error al actualizar producto correspondiente en Firestore:", err);
+              }
+            } else {
+              if (productUpdates.name !== undefined) {
+                localStorage.setItem(`saman_name_${productId}`, productUpdates.name);
+              }
+              if (productUpdates.und_x_caja !== undefined) {
+                localStorage.setItem(`saman_und_x_caja_${productId}`, String(productUpdates.und_x_caja));
+              }
+              if (productUpdates.company !== undefined) {
+                localStorage.setItem(`saman_company_${productId}`, productUpdates.company);
+              }
+            }
+            if (typeof window !== 'undefined') {
+              (window as any).__samanProductsCache = null;
+            }
+          }
+        }
+      }
+    }
+    toast.success("Pedido actualizado con éxito.");
+  };
+
   useEffect(() => {
     if (isFirebaseConfigured) {
       let unsubscribeUserDoc: (() => void) | null = null;
@@ -415,7 +475,7 @@ function AppContent() {
           />
         )}
         {currentView === 'compras' && (
-          <ComprasView orders={orders} onNavigate={navigateToView} aisles={aisles} checkedOrders={checkedOrders} toggleChecked={toggleChecked} user={user} />
+          <ComprasView orders={orders} onNavigate={navigateToView} aisles={aisles} checkedOrders={checkedOrders} toggleChecked={toggleChecked} onUpdateOrder={handleUpdateOrder} user={user} />
         )}
         {currentView === 'configuracion' && (
           <ConfiguracionView aisles={aisles} users={users} setUsers={setUsers} />

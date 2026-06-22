@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Printer, ChevronDown, X, Store, CheckCircle2, Circle, CalendarDays, Package, ArrowUp } from 'lucide-react';
+import { Search, Printer, ChevronDown, X, Store, CheckCircle2, Circle, CalendarDays, Package, ArrowUp, Pencil } from 'lucide-react';
 import { ViewState, OrderItem, Aisle } from '../types';
 
 interface ComprasViewProps {
@@ -8,6 +8,7 @@ interface ComprasViewProps {
   aisles: Aisle[];
   checkedOrders: Set<string>;
   toggleChecked: (id: string) => void;
+  onUpdateOrder: (orderId: string, updates: any) => Promise<void>;
   user?: any;
 }
 
@@ -93,7 +94,7 @@ function getWeekKey(isoOrLegacy: string): string {
   return monday.toISOString().slice(0, 10);
 }
 
-export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleChecked, user }: ComprasViewProps) {
+export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleChecked, onUpdateOrder, user }: ComprasViewProps) {
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAisleFilter, setSelectedAisleFilter] = useState<number | null>(null);
@@ -107,6 +108,36 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
   const [printStatusFilter, setPrintStatusFilter] = useState<'all' | 'critical' | 'critical-low'>('all');
 
   const [showScrollTop, setShowScrollTop] = useState(false);
+
+  // State for order item inline editing
+  const [isEditing, setIsEditing] = useState(false);
+  const [editProductName, setEditProductName] = useState('');
+  const [editUndXCaja, setEditUndXCaja] = useState('0');
+  const [editCompany, setEditCompany] = useState('');
+
+  const handleStartEdit = () => {
+    if (!selectedOrder) return;
+    setEditProductName(selectedOrder.productName);
+    setEditUndXCaja(String(selectedOrder.und_x_caja ?? 0));
+    setEditCompany(selectedOrder.company || '');
+    setIsEditing(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedOrder) return;
+    const val = parseInt(editUndXCaja, 10);
+    const und_x_caja = isNaN(val) ? 0 : Math.max(0, val);
+
+    const updates = {
+      productName: editProductName.trim(),
+      und_x_caja,
+      company: editCompany.trim()
+    };
+
+    await onUpdateOrder(selectedOrder.id, updates);
+    setSelectedOrder(prev => prev ? { ...prev, ...updates } : null);
+    setIsEditing(false);
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -745,70 +776,148 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
 
       {/* Detail Modal */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print-hide" onClick={() => setSelectedOrder(null)}>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print-hide" onClick={() => { setSelectedOrder(null); setIsEditing(false); }}>
           <div className="bg-card-surface rounded-[32px] w-full max-w-lg shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center p-6 border-b border-outline-variant/20 flex-shrink-0">
-              <h3 className="font-sans text-[20px] font-bold text-on-surface">Detalle de Pedido</h3>
-              <button onClick={() => setSelectedOrder(null)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-variant transition-colors cursor-pointer">
+              <div className="flex items-center gap-2">
+                <h3 className="font-sans text-[20px] font-bold text-on-surface">
+                  {isEditing ? 'Editar Pedido' : 'Detalle de Pedido'}
+                </h3>
+                {!isEditing && (
+                  <button
+                    onClick={() => handleStartEdit()}
+                    className="text-primary hover:text-primary/70 transition-colors p-1.5 rounded-full hover:bg-primary/10 cursor-pointer"
+                    title="Editar pedido"
+                  >
+                    <Pencil size={18} />
+                  </button>
+                )}
+              </div>
+              <button onClick={() => { setSelectedOrder(null); setIsEditing(false); }} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-variant transition-colors cursor-pointer">
                 <X size={20} />
               </button>
             </div>
 
             <div className="p-6 flex flex-col gap-4 overflow-y-auto flex-1">
-              <div className="flex flex-col">
-                <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Producto</span>
-                <span className="font-sans text-[18px] font-bold text-on-surface leading-tight mt-0.5">{selectedOrder.productName}</span>
-                <span className="font-mono text-[13px] text-[#4f6b53] mt-0.5">{selectedOrder.brand}</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 border-t border-b border-outline-variant/15 py-4 my-2">
-                <div>
-                  <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">SKU</span>
-                  <span className="font-mono text-[14px] font-semibold text-on-surface">{selectedOrder.sku}</span>
-                </div>
-                <div>
-                  <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Cantidad Sugerida</span>
-                  <span className="font-sans text-[16px] font-bold text-primary">{selectedOrder.suggestedQty} {selectedOrder.unit || 'und'}</span>
-                </div>
-                <div>
-                  <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Ubicación</span>
-                  <span className="font-sans text-[14px] text-on-surface">Pasillo {selectedOrder.aisle}</span>
-                </div>
-                <div>
-                  <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Solicitado Por</span>
-                  <span className="font-sans text-[14px] text-on-surface">{selectedOrder.user}</span>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <div className="flex flex-col">
-                  <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Estado</span>
-                  <div className="mt-1">
-                    {selectedOrder.status === 'crítico' && <span className="inline-flex px-3 py-1 bg-error/10 text-error rounded-full font-mono text-[11px] font-bold uppercase tracking-wider border border-error/20">Crítico</span>}
-                    {selectedOrder.status === 'bajo' && <span className="inline-flex px-3 py-1 bg-amber-500/10 text-amber-700 rounded-full font-mono text-[11px] font-bold uppercase tracking-wider border border-amber-500/20">Stock Bajo</span>}
-                    {selectedOrder.status === 'normal' && <span className="inline-flex px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full font-mono text-[11px] font-bold uppercase tracking-wider border border-secondary/20">Normal</span>}
+              {isEditing ? (
+                <>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Nombre del Producto</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={editProductName}
+                      onChange={(e) => setEditProductName(e.target.value)}
+                      placeholder="Ej. Leche Semidescremada 1L"
+                      className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+                    />
                   </div>
-                </div>
-                <div className="text-right">
-                  <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Enviado</span>
-                  <span className="font-mono text-[13px] text-on-surface-variant">
-                    {formatDayLabel(selectedOrder.lastUpdated)} {formatTime(selectedOrder.lastUpdated)}
-                  </span>
-                </div>
-              </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Unidades por Caja</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      value={editUndXCaja}
+                      onChange={(e) => setEditUndXCaja(e.target.value)}
+                      placeholder="Ej. 24"
+                      className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Empresa / Distribuidor</label>
+                    <input 
+                      type="text" 
+                      value={editCompany}
+                      onChange={(e) => setEditCompany(e.target.value)}
+                      placeholder="Ej. Alimentos Polar"
+                      className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-col">
+                    <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Producto</span>
+                    <span className="font-sans text-[18px] font-bold text-on-surface leading-tight mt-0.5">{selectedOrder.productName}</span>
+                    <span className="font-mono text-[13px] text-[#4f6b53] mt-0.5">{selectedOrder.brand}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 border-t border-b border-outline-variant/15 py-4 my-2">
+                    <div>
+                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">SKU</span>
+                      <span className="font-mono text-[14px] font-semibold text-on-surface">{selectedOrder.sku}</span>
+                    </div>
+                    <div>
+                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Cantidad Sugerida</span>
+                      <span className="font-sans text-[16px] font-bold text-primary">{selectedOrder.suggestedQty} {selectedOrder.unit || 'und'}</span>
+                    </div>
+                    <div>
+                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Ubicación</span>
+                      <span className="font-sans text-[14px] text-on-surface">Pasillo {selectedOrder.aisle}</span>
+                    </div>
+                    <div>
+                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Solicitado Por</span>
+                      <span className="font-sans text-[14px] text-on-surface">{selectedOrder.user}</span>
+                    </div>
+                    <div>
+                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Cantidad por Caja</span>
+                      <span className="font-sans text-[14px] font-semibold text-on-surface">{selectedOrder.und_x_caja ?? 0} und</span>
+                    </div>
+                    <div>
+                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Empresa / Distribuidor</span>
+                      <span className="font-sans text-[14px] font-semibold text-on-surface">{selectedOrder.company || 'Sin especificar'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <div className="flex flex-col">
+                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Estado</span>
+                      <div className="mt-1">
+                        {selectedOrder.status === 'crítico' && <span className="inline-flex px-3 py-1 bg-error/10 text-error rounded-full font-mono text-[11px] font-bold uppercase tracking-wider border border-error/20">Crítico</span>}
+                        {selectedOrder.status === 'bajo' && <span className="inline-flex px-3 py-1 bg-amber-500/10 text-amber-700 rounded-full font-mono text-[11px] font-bold uppercase tracking-wider border border-amber-500/20">Stock Bajo</span>}
+                        {selectedOrder.status === 'normal' && <span className="inline-flex px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full font-mono text-[11px] font-bold uppercase tracking-wider border border-secondary/20">Normal</span>}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Enviado</span>
+                      <span className="font-mono text-[13px] text-on-surface-variant">
+                        {formatDayLabel(selectedOrder.lastUpdated)} {formatTime(selectedOrder.lastUpdated)}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="p-6 bg-surface-variant/30 border-t border-outline-variant/20 flex gap-3 flex-shrink-0">
-              <button onClick={() => setSelectedOrder(null)} className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3 rounded-full shadow-sm transition-all cursor-pointer">
-                Cerrar
-              </button>
-              <button
-                onClick={() => { setSelectedOrder(null); onNavigate('pasillo-detail', selectedOrder.aisle); }}
-                className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3 rounded-full shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
-              >
-                <Store size={16} />
-                Ir al Pasillo
-              </button>
+              {isEditing ? (
+                <>
+                  <button onClick={() => setIsEditing(false)} className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3 rounded-full shadow-sm transition-all cursor-pointer">
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => handleSaveEdit()}
+                    className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3 rounded-full shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    Guardar
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setSelectedOrder(null)} className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3 rounded-full shadow-sm transition-all cursor-pointer">
+                    Cerrar
+                  </button>
+                  <button
+                    onClick={() => { setSelectedOrder(null); onNavigate('pasillo-detail', selectedOrder.aisle); }}
+                    className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3 rounded-full shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Store size={16} />
+                    Ir al Pasillo
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
