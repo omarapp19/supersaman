@@ -97,6 +97,9 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAisleFilter, setSelectedAisleFilter] = useState<number | null>(null);
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<'crítico' | 'bajo' | 'normal' | null>(null);
+  const [selectedOperatorFilter, setSelectedOperatorFilter] = useState<string | null>(null);
+  const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string | null>(null);
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printGroupBy, setPrintGroupBy] = useState<'aisle' | 'day' | 'week' | 'operator'>('aisle');
@@ -154,6 +157,19 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
       if (!match) return false;
     }
     if (selectedAisleFilter !== null && order.aisle !== selectedAisleFilter) return false;
+    if (selectedStatusFilter !== null && order.status !== selectedStatusFilter) return false;
+    if (selectedOperatorFilter !== null) {
+      const orderUser = order.user || '';
+      if (orderUser.toLowerCase() !== selectedOperatorFilter.toLowerCase()) {
+        return false;
+      }
+    }
+    if (selectedCompanyFilter !== null) {
+      const orderCompany = (order as any).company || '';
+      if (orderCompany.toLowerCase() !== selectedCompanyFilter.toLowerCase()) {
+        return false;
+      }
+    }
     return true;
   });
 
@@ -196,6 +212,27 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
     
     if (selectedAisleFilter !== null && order.aisle !== selectedAisleFilter) {
       return false;
+    }
+
+    // Screen Status filter
+    if (selectedStatusFilter !== null && order.status !== selectedStatusFilter) {
+      return false;
+    }
+
+    // Screen Operator filter
+    if (selectedOperatorFilter !== null) {
+      const orderUser = order.user || '';
+      if (orderUser.toLowerCase() !== selectedOperatorFilter.toLowerCase()) {
+        return false;
+      }
+    }
+
+    // Screen Company filter
+    if (selectedCompanyFilter !== null) {
+      const orderCompany = (order as any).company || '';
+      if (orderCompany.toLowerCase() !== selectedCompanyFilter.toLowerCase()) {
+        return false;
+      }
     }
 
     // Print Scope Filter
@@ -334,33 +371,131 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
           </div>
         </div>
 
-        {/* Aisle filters */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          <button
-            onClick={() => setSelectedAisleFilter(null)}
-            className={`px-4 py-2 rounded-full font-mono text-[13px] font-medium border transition-colors shadow-sm cursor-pointer ${
-              selectedAisleFilter === null
-                ? 'bg-secondary-container text-on-secondary-container border-secondary/10'
-                : 'bg-white text-on-surface-variant hover:bg-surface-variant/50 border-outline-variant/30'
-            }`}
-          >
-            Todos los Pasillos
-          </button>
-          {aisles
-            .filter(aisle => !isOperator || user?.assignedAisles?.includes(aisle.number))
-            .map(aisle => (
-              <button
-                key={aisle.id}
-                onClick={() => setSelectedAisleFilter(aisle.number)}
-                className={`px-4 py-2 rounded-full font-mono text-[13px] font-medium border transition-colors shadow-sm cursor-pointer ${
-                  selectedAisleFilter === aisle.number
-                    ? 'bg-secondary-container text-on-secondary-container border-secondary/10'
-                    : 'bg-white text-on-surface-variant hover:bg-surface-variant/50 border-outline-variant/30'
-                }`}
+        {/* Filter bar */}
+        <div className="flex flex-col md:flex-row gap-4 mb-6 items-stretch md:items-end">
+          {/* Pasillo Selector */}
+          <div className="flex-grow flex-shrink min-w-[150px]">
+            <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
+              Pasillo
+            </label>
+            <div className="relative">
+              <select
+                value={selectedAisleFilter !== null ? selectedAisleFilter : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedAisleFilter(val === '' ? null : Number(val));
+                }}
+                className="w-full bg-white border border-outline-variant/30 text-on-surface rounded-2xl py-2.5 pl-4 pr-10 font-sans text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer appearance-none"
               >
-                Pasillo {aisle.number}
-              </button>
-            ))}
+                <option value="">Todos los Pasillos</option>
+                {aisles
+                  .filter(aisle => !isOperator || user?.assignedAisles?.includes(aisle.number))
+                  .map(aisle => (
+                    <option key={aisle.id} value={aisle.number}>
+                      Pasillo {aisle.number} - {aisle.name}
+                    </option>
+                  ))}
+              </select>
+              <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" size={16} />
+            </div>
+          </div>
+
+          {/* Estado Selector */}
+          <div className="flex-grow flex-shrink min-w-[150px]">
+            <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
+              Estado de Stock
+            </label>
+            <div className="relative">
+              <select
+                value={selectedStatusFilter !== null ? selectedStatusFilter : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedStatusFilter(val === '' ? null : val as any);
+                }}
+                className="w-full bg-white border border-outline-variant/30 text-on-surface rounded-2xl py-2.5 pl-4 pr-10 font-sans text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer appearance-none"
+              >
+                <option value="">Todos los Estados</option>
+                <option value="crítico">Crítico</option>
+                <option value="bajo">Bajo</option>
+                <option value="normal">Normal</option>
+              </select>
+              <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" size={16} />
+            </div>
+          </div>
+
+          {/* Operador Selector (only if user is not Operator) */}
+          {!isOperator && (
+            <div className="flex-grow flex-shrink min-w-[150px]">
+              <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
+                Operador
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedOperatorFilter !== null ? selectedOperatorFilter : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedOperatorFilter(val === '' ? null : val);
+                  }}
+                  className="w-full bg-white border border-outline-variant/30 text-on-surface rounded-2xl py-2.5 pl-4 pr-10 font-sans text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer appearance-none"
+                >
+                  <option value="">Todos los Operadores</option>
+                  {Array.from(new Set(orders.map(o => o.user).filter(Boolean)))
+                    .sort()
+                    .map(op => (
+                      <option key={op} value={op}>
+                        {op}
+                      </option>
+                    ))
+                  }
+                </select>
+                <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" size={16} />
+              </div>
+            </div>
+          )}
+
+          {/* Empresa Selector */}
+          <div className="flex-grow flex-shrink min-w-[150px]">
+            <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
+              Empresa
+            </label>
+            <div className="relative">
+              <select
+                value={selectedCompanyFilter !== null ? selectedCompanyFilter : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedCompanyFilter(val === '' ? null : val);
+                }}
+                className="w-full bg-white border border-outline-variant/30 text-on-surface rounded-2xl py-2.5 pl-4 pr-10 font-sans text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer appearance-none"
+              >
+                <option value="">Todas las Empresas</option>
+                {Array.from(new Set(orders.map(o => (o as any).company).filter(Boolean)))
+                  .sort()
+                  .map(company => (
+                    <option key={company} value={company}>
+                      {company}
+                    </option>
+                  ))
+                }
+              </select>
+              <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" size={16} />
+            </div>
+          </div>
+
+          {/* Reset Filters Button */}
+          {(selectedAisleFilter !== null || selectedStatusFilter !== null || selectedOperatorFilter !== null || selectedCompanyFilter !== null) && (
+            <button
+              onClick={() => {
+                setSelectedAisleFilter(null);
+                setSelectedStatusFilter(null);
+                setSelectedOperatorFilter(null);
+                setSelectedCompanyFilter(null);
+              }}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-error/10 hover:bg-error/20 text-error rounded-2xl font-sans text-[13px] font-semibold transition-all cursor-pointer h-[42px] whitespace-nowrap shadow-sm border border-error/20"
+            >
+              <X size={16} />
+              Limpiar
+            </button>
+          )}
         </div>
 
         {/* Empty state */}
@@ -528,6 +663,15 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
           }</div>
           {selectedAisleFilter !== null && (
             <div><strong>Filtro pasillo pantalla:</strong> Pasillo {selectedAisleFilter}</div>
+          )}
+          {selectedStatusFilter !== null && (
+            <div><strong>Filtro estado pantalla:</strong> {selectedStatusFilter}</div>
+          )}
+          {selectedOperatorFilter !== null && (
+            <div><strong>Filtro operador pantalla:</strong> {selectedOperatorFilter}</div>
+          )}
+          {selectedCompanyFilter !== null && (
+            <div><strong>Filtro empresa pantalla:</strong> {selectedCompanyFilter}</div>
           )}
           {searchQuery.trim() && (
             <div><strong>Búsqueda pantalla:</strong> "{searchQuery}"</div>

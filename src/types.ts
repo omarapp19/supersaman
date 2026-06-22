@@ -18,6 +18,7 @@ export interface Product {
   imageUrl?: string;
   initials?: string;
   und_x_caja?: number;
+  company?: string;
 }
 
 export interface OrderItem {
@@ -32,5 +33,6 @@ export interface OrderItem {
   status: 'normal' | 'bajo' | 'crítico';
   lastUpdated: string;
   checked?: boolean;
+  company?: string;
 }
 

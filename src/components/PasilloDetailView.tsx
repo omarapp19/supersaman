@@ -44,6 +44,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState<string>('');
   const [tempSku, setTempSku] = useState<string>('');
+  const [tempCompany, setTempCompany] = useState<string>('');
 
   // Product Creation States
   const [showProductModal, setShowProductModal] = useState(false);
@@ -52,6 +53,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
   const [productBrand, setProductBrand] = useState('');
   const [productSku, setProductSku] = useState('');
   const [productUndXCaja, setProductUndXCaja] = useState('0');
+  const [productCompany, setProductCompany] = useState('');
   const [showScanner, setShowScanner] = useState(false);
 
   const handleScanResult = (code: string) => {
@@ -67,6 +69,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
       setProductBrand('');
       setProductSku(code);
       setProductUndXCaja('0');
+      setProductCompany('');
       setShowProductModal(true);
       toast.info('Producto no registrado en este pasillo.');
     }
@@ -85,20 +88,22 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
     setProductToDelete(null);
   };
 
-  const handleUpdateProductDetails = async (productId: string, skuStr: string, undXCajaStr: string) => {
+  const handleUpdateProductDetails = async (productId: string, skuStr: string, undXCajaStr: string, companyStr: string) => {
     const sku = skuStr.trim();
     const val = parseInt(undXCajaStr, 10);
     const und_x_caja = isNaN(val) ? 0 : Math.max(0, val);
+    const company = companyStr.trim();
 
     try {
       if (isFirebaseConfigured && aisle?.id) {
         const productRef = doc(db, 'aisles', aisle.id, 'products', productId);
-        await setDoc(productRef, { sku, und_x_caja }, { merge: true });
+        await setDoc(productRef, { sku, und_x_caja, company }, { merge: true });
       } else {
         // Mode demo: update local state and localStorage
-        setProducts(prev => prev.map(p => p.id === productId ? { ...p, sku, und_x_caja } : p));
+        setProducts(prev => prev.map(p => p.id === productId ? { ...p, sku, und_x_caja, company } : p));
         localStorage.setItem(`saman_sku_${productId}`, sku);
         localStorage.setItem(`saman_und_x_caja_${productId}`, String(und_x_caja));
+        localStorage.setItem(`saman_company_${productId}`, company);
       }
       if (typeof window !== 'undefined') {
         (window as any).__samanProductsCache = null;
@@ -127,7 +132,8 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
       sku: productSku.trim(),
       status: 'normal',
       initials: initials,
-      und_x_caja: und_x_caja
+      und_x_caja: und_x_caja,
+      company: productCompany.trim()
     };
 
     try {
@@ -140,6 +146,9 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
         localStorage.setItem(`saman_sku_${newProduct.id}`, newProduct.sku);
         if (und_x_caja > 0) {
           localStorage.setItem(`saman_und_x_caja_${newProduct.id}`, String(und_x_caja));
+        }
+        if (productCompany.trim()) {
+          localStorage.setItem(`saman_company_${newProduct.id}`, productCompany.trim());
         }
       }
       
@@ -202,10 +211,12 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
       const productsWithLocalData = freshProducts.map(p => {
         const localVal = localStorage.getItem(`saman_und_x_caja_${p.id}`);
         const localSku = localStorage.getItem(`saman_sku_${p.id}`);
+        const localCompany = localStorage.getItem(`saman_company_${p.id}`);
         return {
           ...p,
           und_x_caja: localVal !== null ? parseInt(localVal, 10) : p.und_x_caja,
-          sku: localSku !== null ? localSku : p.sku
+          sku: localSku !== null ? localSku : p.sku,
+          company: localCompany !== null ? localCompany : p.company
         };
       });
       setProducts(productsWithLocalData);
@@ -306,6 +317,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
               setProductBrand('');
               setProductSku('');
               setProductUndXCaja('0');
+              setProductCompany('');
               setShowProductModal(true);
             }}
             className="flex items-center gap-1 text-primary font-mono text-[13px] font-semibold hover:bg-primary/5 px-3 py-1.5 rounded-full border border-primary/20 transition-colors cursor-pointer bg-white"
@@ -390,7 +402,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                               onChange={(e) => setTempSku(e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
-                                  handleUpdateProductDetails(product.id, tempSku, tempValue);
+                                  handleUpdateProductDetails(product.id, tempSku, tempValue, tempCompany);
                                 } else if (e.key === 'Escape') {
                                   setEditingProductId(null);
                                 }
@@ -406,15 +418,30 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                               onChange={(e) => setTempValue(e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
-                                  handleUpdateProductDetails(product.id, tempSku, tempValue);
+                                  handleUpdateProductDetails(product.id, tempSku, tempValue, tempCompany);
                                 } else if (e.key === 'Escape') {
                                   setEditingProductId(null);
                                 }
                               }}
                               className="w-16 px-1.5 py-0.5 border border-primary rounded font-mono text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-white"
                             />
+                            <span className="font-mono text-[13px] text-[#4f6b53]">Empresa:</span>
+                            <input
+                              type="text"
+                              value={tempCompany}
+                              onChange={(e) => setTempCompany(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleUpdateProductDetails(product.id, tempSku, tempValue, tempCompany);
+                                } else if (e.key === 'Escape') {
+                                  setEditingProductId(null);
+                                }
+                              }}
+                              placeholder="Empresa"
+                              className="w-28 px-1.5 py-0.5 border border-primary rounded font-sans text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                            />
                             <button
-                              onClick={() => handleUpdateProductDetails(product.id, tempSku, tempValue)}
+                              onClick={() => handleUpdateProductDetails(product.id, tempSku, tempValue, tempCompany)}
                               className="px-2 py-0.5 bg-primary text-white rounded font-sans text-[11px] font-semibold hover:bg-primary/95 cursor-pointer"
                             >
                               Guardar
@@ -429,7 +456,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                         ) : (
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-mono text-[13px] text-[#4f6b53]">
-                              {product.brand} • SKU: {product.sku} • Caja: {product.und_x_caja ?? 0} und
+                              {product.brand} • SKU: {product.sku} • Caja: {product.und_x_caja ?? 0} und{product.company ? ` • Empresa: ${product.company}` : ''}
                             </span>
                             {(user?.role === 'operador' || user?.role === 'admin') && (
                               <button
@@ -437,6 +464,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                                   setEditingProductId(product.id);
                                   setTempSku(product.sku || '');
                                   setTempValue(String(product.und_x_caja ?? 0));
+                                  setTempCompany(product.company || '');
                                 }}
                                 className="text-primary hover:text-primary/70 transition-colors p-0.5 inline-flex items-center gap-0.5 cursor-pointer"
                                 title="Editar producto"
@@ -515,6 +543,17 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
               </div>
 
 
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Empresa / Distribuidor</label>
+                <input 
+                  type="text" 
+                  value={productCompany}
+                  onChange={(e) => setProductCompany(e.target.value)}
+                  placeholder="Ej. Alimentos Polar"
+                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+                />
+              </div>
 
               <div className="flex flex-col gap-1.5">
                 <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Unidades por Caja</label>
