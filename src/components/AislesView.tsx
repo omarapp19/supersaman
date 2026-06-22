@@ -43,15 +43,17 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle, user
     setLoadingAllProducts(true);
     try {
       if (isFirebaseConfigured) {
-        const { collectionGroup, getDocs } = await import('firebase/firestore');
-        const snap = await getDocs(collectionGroup(db, 'products'));
-        const list = snap.docs.map(docSnap => {
-          const productData = { id: docSnap.id, ...docSnap.data() };
-          const pathSegments = docSnap.ref.path.split('/');
-          const aisleId = pathSegments[1];
-          const aisle = aisles.find(a => a.id === aisleId);
-          return { product: productData, aisle };
-        }).filter(item => item.aisle !== undefined) as { product: any; aisle: Aisle }[];
+        const { collection, getDocs } = await import('firebase/firestore');
+        const promises = aisles.map(async (aisle) => {
+          const productsRef = collection(db, 'aisles', aisle.id, 'products');
+          const snap = await getDocs(productsRef);
+          return snap.docs.map(docSnap => ({
+            product: { id: docSnap.id, ...docSnap.data() },
+            aisle
+          }));
+        });
+        const results = await Promise.all(promises);
+        const list = results.flat();
 
         if (typeof window !== 'undefined') {
           (window as any).__samanProductsCache = list;

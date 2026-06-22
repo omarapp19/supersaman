@@ -27,7 +27,7 @@ export function BottomNav({ currentView, onNavigate, user }: BottomNavProps) {
       <NavItem 
         active={currentView === 'compras'} 
         icon={Receipt} 
-        label={isOperator ? "Mis Pedidos" : "Pedidos"} 
+        label={isOperator ? "Mis Pedidos" : "Compras"} 
         onClick={() => onNavigate('compras')} 
       />
       {!isOperator && (
