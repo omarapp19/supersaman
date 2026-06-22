@@ -103,6 +103,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<'crítico' | 'bajo' | 'normal' | null>(null);
   const [selectedOperatorFilter, setSelectedOperatorFilter] = useState<string | null>(null);
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string | null>(null);
+  const [selectedCheckedFilter, setSelectedCheckedFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printGroupBy, setPrintGroupBy] = useState<'aisle' | 'day' | 'week' | 'operator'>('aisle');
@@ -267,6 +268,11 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
         return false;
       }
     }
+
+    const isChecked = checkedOrders.has(order.id);
+    if (selectedCheckedFilter === 'pending' && isChecked) return false;
+    if (selectedCheckedFilter === 'completed' && !isChecked) return false;
+
     return true;
   });
 
@@ -578,14 +584,36 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
             </div>
           </div>
 
+          {/* Estado del Pedido Selector */}
+          <div className="flex-grow flex-shrink min-w-[150px]">
+            <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
+              Estado del Pedido
+            </label>
+            <div className="relative">
+              <select
+                value={selectedCheckedFilter}
+                onChange={(e) => {
+                  setSelectedCheckedFilter(e.target.value as any);
+                }}
+                className="w-full bg-white border border-outline-variant/30 text-on-surface rounded-2xl py-2.5 pl-4 pr-10 font-sans text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer appearance-none"
+              >
+                <option value="all">Todos los Pedidos</option>
+                <option value="pending">Solo Pendientes</option>
+                <option value="completed">Solo Pedidos/Completados</option>
+              </select>
+              <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" size={16} />
+            </div>
+          </div>
+ 
           {/* Reset Filters Button */}
-          {(selectedAisleFilter !== null || selectedStatusFilter !== null || selectedOperatorFilter !== null || selectedCompanyFilter !== null) && (
+          {(selectedAisleFilter !== null || selectedStatusFilter !== null || selectedOperatorFilter !== null || selectedCompanyFilter !== null || selectedCheckedFilter !== 'all') && (
             <button
               onClick={() => {
                 setSelectedAisleFilter(null);
                 setSelectedStatusFilter(null);
                 setSelectedOperatorFilter(null);
                 setSelectedCompanyFilter(null);
+                setSelectedCheckedFilter('all');
               }}
               className="flex items-center justify-center gap-2 px-5 py-2.5 bg-error/10 hover:bg-error/20 text-error rounded-2xl font-sans text-[13px] font-semibold transition-all cursor-pointer h-[42px] whitespace-nowrap shadow-sm border border-error/20"
             >
