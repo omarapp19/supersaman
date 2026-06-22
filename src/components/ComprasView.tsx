@@ -139,6 +139,33 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
     setIsEditing(false);
   };
 
+  // State for inline editing in the list
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [tempProductName, setTempProductName] = useState('');
+  const [tempUndXCaja, setTempUndXCaja] = useState('0');
+  const [tempCompany, setTempCompany] = useState('');
+
+  const handleStartInlineEdit = (order: OrderItem) => {
+    setTempProductName(order.productName);
+    setTempUndXCaja(String(order.und_x_caja ?? 0));
+    setTempCompany(order.company || '');
+    setEditingOrderId(order.id);
+  };
+
+  const handleSaveInlineEdit = async (orderId: string) => {
+    const val = parseInt(tempUndXCaja, 10);
+    const und_x_caja = isNaN(val) ? 0 : Math.max(0, val);
+
+    const updates = {
+      productName: tempProductName.trim(),
+      und_x_caja,
+      company: tempCompany.trim()
+    };
+
+    await onUpdateOrder(orderId, updates);
+    setEditingOrderId(null);
+  };
+
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 300) {
@@ -622,37 +649,117 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                             </button>
                           )}
 
-                          {/* Main info — clickable to open modal */}
-                          <div
-                            className="flex-1 flex items-center justify-between gap-4 cursor-pointer min-w-0"
-                            onClick={() => setSelectedOrder(order)}
-                          >
-                            <div className="min-w-0">
-                              <p className={`font-sans text-[15px] font-semibold ${isChecked ? 'line-through text-on-surface-variant' : 'text-on-surface'}`}>
-                                {order.productName}
-                              </p>
-                              <p className="font-mono text-[12px] text-on-surface-variant">
-                                {order.brand} · SKU {order.sku} · Pasillo {order.aisle}
-                              </p>
+                          {/* Main content area */}
+                          {editingOrderId === order.id ? (
+                            <div className="flex-1 flex flex-col gap-2 min-w-0 py-1" onClick={(e) => e.stopPropagation()}>
+                              {/* Row 1: Product Name input */}
+                              <div className="flex items-center gap-2 w-full">
+                                <span className="font-sans text-[13px] font-medium text-on-surface-variant whitespace-nowrap">Nombre:</span>
+                                <input
+                                  type="text"
+                                  value={tempProductName}
+                                  onChange={(e) => setTempProductName(e.target.value)}
+                                  className="flex-1 min-w-[150px] px-2.5 py-1 border border-primary rounded-xl font-sans text-[14px] focus:outline-none focus:ring-1 focus:ring-primary bg-white shadow-sm"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveInlineEdit(order.id);
+                                    else if (e.key === 'Escape') setEditingOrderId(null);
+                                  }}
+                                />
+                              </div>
+                              {/* Row 2: Box Qty and Company inputs + Action buttons */}
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-sans text-[13px] font-medium text-on-surface-variant">Caja:</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={tempUndXCaja}
+                                    onChange={(e) => setTempUndXCaja(e.target.value)}
+                                    className="w-16 px-1.5 py-0.5 border border-primary rounded-xl font-mono text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-white shadow-sm"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleSaveInlineEdit(order.id);
+                                      else if (e.key === 'Escape') setEditingOrderId(null);
+                                    }}
+                                  />
+                                  <span className="font-mono text-[12px] text-on-surface-variant">und</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-sans text-[13px] font-medium text-on-surface-variant">Empresa:</span>
+                                  <input
+                                    type="text"
+                                    value={tempCompany}
+                                    onChange={(e) => setTempCompany(e.target.value)}
+                                    placeholder="Empresa"
+                                    className="w-32 px-1.5 py-0.5 border border-primary rounded-xl font-sans text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-white shadow-sm"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleSaveInlineEdit(order.id);
+                                      else if (e.key === 'Escape') setEditingOrderId(null);
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex items-center gap-2 ml-auto">
+                                  <button
+                                    onClick={() => handleSaveInlineEdit(order.id)}
+                                    className="px-3 py-1 bg-primary text-white rounded-full font-sans text-[12px] font-semibold hover:bg-primary/95 cursor-pointer shadow-sm animate-in fade-in zoom-in duration-200"
+                                  >
+                                    Guardar
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingOrderId(null)}
+                                    className="px-3 py-1 bg-white border border-outline-variant/50 text-on-surface-variant rounded-full font-sans text-[12px] font-semibold hover:bg-surface-variant/50 cursor-pointer shadow-sm animate-in fade-in zoom-in duration-200"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
                             </div>
+                          ) : (
+                            <div
+                              className="flex-1 flex items-center justify-between gap-4 cursor-pointer min-w-0"
+                              onClick={() => setSelectedOrder(order)}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className={`font-sans text-[15px] font-semibold ${isChecked ? 'line-through text-on-surface-variant' : 'text-on-surface'}`}>
+                                    {order.productName}
+                                  </p>
+                                  {!isChecked && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleStartInlineEdit(order);
+                                      }}
+                                      className="text-primary hover:text-primary/70 transition-colors p-0.5 inline-flex items-center cursor-pointer"
+                                      title="Editar producto"
+                                    >
+                                      <Pencil size={13} />
+                                    </button>
+                                  )}
+                                </div>
+                                <p className="font-mono text-[12px] text-on-surface-variant">
+                                  {order.brand} · SKU {order.sku} · Pasillo {order.aisle} {order.und_x_caja !== undefined && order.und_x_caja > 0 ? ` · Caja: ${order.und_x_caja} und` : ''} {order.company ? ` · ${order.company}` : ''}
+                                </p>
+                              </div>
 
-                            <div className="flex items-center gap-3 flex-shrink-0">
-                              <span className="font-sans text-[15px] font-bold text-on-surface whitespace-nowrap">
-                                {order.suggestedQty} {order.unit || 'und'}
-                              </span>
-                              {isChecked
-                                ? <span className="inline-flex px-2.5 py-1 bg-primary/10 text-primary rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-primary/20 whitespace-nowrap">Pedido ✓</span>
-                                : <>
-                                  {order.status === 'crítico' && <span className="inline-flex px-2.5 py-1 bg-error/10 text-error rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-error/20 whitespace-nowrap">Crítico</span>}
-                                  {order.status === 'bajo' && <span className="inline-flex px-2.5 py-1 bg-amber-500/10 text-amber-700 rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-amber-500/20 whitespace-nowrap">Bajo</span>}
-                                  {order.status === 'normal' && <span className="inline-flex px-2.5 py-1 bg-secondary-container text-on-secondary-container rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-secondary/20 whitespace-nowrap">Normal</span>}
-                                </>
-                              }
-                              <span className="font-mono text-[12px] text-on-surface-variant/60 hidden sm:block">
-                                {formatTime(order.lastUpdated)}
-                              </span>
+                              <div className="flex items-center gap-3 flex-shrink-0">
+                                <span className="font-sans text-[15px] font-bold text-on-surface whitespace-nowrap">
+                                  {order.suggestedQty} {order.unit || 'und'}
+                                </span>
+                                {isChecked
+                                  ? <span className="inline-flex px-2.5 py-1 bg-primary/10 text-primary rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-primary/20 whitespace-nowrap">Pedido ✓</span>
+                                  : <>
+                                    {order.status === 'crítico' && <span className="inline-flex px-2.5 py-1 bg-error/10 text-error rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-error/20 whitespace-nowrap">Crítico</span>}
+                                    {order.status === 'bajo' && <span className="inline-flex px-2.5 py-1 bg-amber-500/10 text-amber-700 rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-amber-500/20 whitespace-nowrap">Bajo</span>}
+                                    {order.status === 'normal' && <span className="inline-flex px-2.5 py-1 bg-secondary-container text-on-secondary-container rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-secondary/20 whitespace-nowrap">Normal</span>}
+                                  </>
+                                }
+                                <span className="font-mono text-[12px] text-on-surface-variant/60 hidden sm:block">
+                                  {formatTime(order.lastUpdated)}
+                                </span>
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       );
                     })}
