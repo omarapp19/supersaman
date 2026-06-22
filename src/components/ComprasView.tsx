@@ -584,24 +584,30 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
             </div>
           </div>
 
-          {/* Estado del Pedido Selector */}
-          <div className="flex-grow flex-shrink min-w-[150px]">
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
-              Estado del Pedido
+          {/* Estado del Pedido Selector (Segmented Switch) */}
+          <div className="flex flex-col gap-1.5 min-w-[250px] flex-grow flex-shrink">
+            <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant ml-1 font-bold">
+              Filtrar por Pedido
             </label>
-            <div className="relative">
-              <select
-                value={selectedCheckedFilter}
-                onChange={(e) => {
-                  setSelectedCheckedFilter(e.target.value as any);
-                }}
-                className="w-full bg-white border border-outline-variant/30 text-on-surface rounded-2xl py-2.5 pl-4 pr-10 font-sans text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer appearance-none"
-              >
-                <option value="all">Todos los Pedidos</option>
-                <option value="pending">Solo Pendientes</option>
-                <option value="completed">Solo Pedidos/Completados</option>
-              </select>
-              <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" size={16} />
+            <div className="flex bg-white border border-outline-variant/30 rounded-2xl p-1 shadow-sm h-[46px] items-center">
+              {[
+                { val: 'all', label: 'Todos' },
+                { val: 'pending', label: 'Pendientes' },
+                { val: 'completed', label: 'Pedidos' }
+              ].map(opt => (
+                <button
+                  key={opt.val}
+                  type="button"
+                  onClick={() => setSelectedCheckedFilter(opt.val as any)}
+                  className={`flex-1 h-full rounded-xl font-sans text-[13px] font-semibold transition-all cursor-pointer text-center flex items-center justify-center ${
+                    selectedCheckedFilter === opt.val
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
           </div>
  
