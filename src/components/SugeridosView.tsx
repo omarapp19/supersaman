@@ -175,17 +175,17 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
     setLoadingAllProducts(true);
     try {
       if (isFirebaseConfigured) {
-        const { collection, getDocs } = await import('firebase/firestore');
-        const promises = aisles.map(async (aisle) => {
-          const productsRef = collection(db, 'aisles', aisle.id, 'products');
-          const snap = await getDocs(productsRef);
-          return snap.docs.map(docSnap => ({
+        const { collectionGroup, getDocs } = await import('firebase/firestore');
+        const productsGroupRef = collectionGroup(db, 'products');
+        const snap = await getDocs(productsGroupRef);
+        const list = snap.docs.map(docSnap => {
+          const parentAisleDoc = docSnap.ref.parent.parent;
+          const aisleItem = aisles.find(a => a.id === parentAisleDoc?.id);
+          return {
             product: { id: docSnap.id, ...docSnap.data() } as Product,
-            aisle
-          }));
-        });
-        const results = await Promise.all(promises);
-        const list = results.flat();
+            aisle: aisleItem || { id: parentAisleDoc?.id || '', name: 'Pasillo', number: 0, status: 'unassigned', progress: 0 }
+          };
+        }).filter(item => item.aisle.number !== 0);
 
         if (typeof window !== 'undefined') {
           (window as any).__samanProductsCache = list;
@@ -265,18 +265,21 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
     if (list.length === 0) {
       try {
         if (isFirebaseConfigured) {
-          const { collection, getDocs } = await import('firebase/firestore');
-          const promises = aisles.map(async (aisle) => {
-            const productsRef = collection(db, 'aisles', aisle.id, 'products');
-            const snap = await getDocs(productsRef);
-            return snap.docs.map(doc => ({
-              product: { id: doc.id, ...doc.data() } as Product,
-              aisle
-            }));
-          });
-          const results = await Promise.all(promises);
-          list = results.flat();
+          const { collectionGroup, getDocs } = await import('firebase/firestore');
+          const productsGroupRef = collectionGroup(db, 'products');
+          const snap = await getDocs(productsGroupRef);
+          list = snap.docs.map(docSnap => {
+            const parentAisleDoc = docSnap.ref.parent.parent;
+            const aisleItem = aisles.find(a => a.id === parentAisleDoc?.id);
+            return {
+              product: { id: docSnap.id, ...docSnap.data() } as Product,
+              aisle: aisleItem || { id: parentAisleDoc?.id || '', name: 'Pasillo', number: 0, status: 'unassigned', progress: 0 }
+            };
+          }).filter(item => item.aisle.number !== 0);
           setAllProducts(list);
+          if (typeof window !== 'undefined') {
+            (window as any).__samanProductsCache = list;
+          }
         } else {
           const demoList: { product: Product; aisle: Aisle }[] = [];
           aisles.forEach(aisle => {
@@ -661,7 +664,8 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
   // Step 1: Aisle Selector View
   if (!selectedAisle) {
     return (
-      <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+      <>
+        <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
         {isOffline && (
           <div className="offline-banner w-full py-1.5 flex justify-center items-center gap-2 shadow-sm rounded-lg mb-4 animate-in fade-in slide-in-from-top-2">
             <CloudOff size={14} className="text-[#745815]" />
@@ -797,9 +801,11 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
           </section>
         )}
         
-        {/* FAB */}
+        </div>
+
+        {/* FAB outside of animated container */}
         {Object.keys(draft).length > 0 && (
-          <div className="fixed bottom-[80px] md:bottom-6 left-0 md:left-64 right-0 px-4 pt-8 pb-4 bg-gradient-to-t from-[var(--color-background)] via-[var(--color-background)] to-transparent pointer-events-none z-40 flex justify-center gap-3">
+          <div className="fixed bottom-[80px] md:bottom-6 left-0 md:left-64 right-0 px-4 pt-8 pb-4 bg-gradient-to-t from-[var(--color-background)] via-[var(--color-background)] to-transparent pointer-events-none z-40 flex justify-center gap-3 transform-gpu">
             <button 
               onClick={handleDiscardDraft}
               className="px-6 py-4 bg-white border border-outline-variant text-[#ba1a1a] hover:bg-red-50/50 rounded-full shadow-md flex items-center justify-center gap-2 hover:scale-[0.98] active:scale-95 transition-all pointer-events-auto cursor-pointer font-sans text-[16px] font-semibold"
@@ -826,13 +832,14 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
             onClose={() => setShowGlobalScanner(false)}
           />
         )}
-      </div>
+      </>
     );
   }
 
   // Step 2: Product Suggestion Form View for the Chosen Aisle
   return (
-    <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24 md:pb-8">
+    <>
+      <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24 md:pb-8">
       {isOffline && (
         <div className="offline-banner w-full py-1.5 flex justify-center items-center gap-2 shadow-sm rounded-lg mb-4 animate-in fade-in slide-in-from-top-2">
           <CloudOff size={14} className="text-[#745815]" />
@@ -1075,9 +1082,11 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
         )}
       </div>
 
-      {/* FAB */}
+      </div>
+
+      {/* FAB outside of animated container */}
       {Object.keys(draft).length > 0 && (
-        <div className="fixed bottom-[80px] md:bottom-6 left-0 md:left-64 right-0 px-4 pt-8 pb-4 bg-gradient-to-t from-[var(--color-background)] via-[var(--color-background)] to-transparent pointer-events-none z-40 flex justify-center gap-3">
+        <div className="fixed bottom-[80px] md:bottom-6 left-0 md:left-64 right-0 px-4 pt-8 pb-4 bg-gradient-to-t from-[var(--color-background)] via-[var(--color-background)] to-transparent pointer-events-none z-40 flex justify-center gap-3 transform-gpu">
           <button 
             onClick={handleDiscardDraft}
             className="px-6 py-4 bg-white border border-outline-variant text-[#ba1a1a] hover:bg-red-50/50 rounded-full shadow-md flex items-center justify-center gap-2 hover:scale-[0.98] active:scale-95 transition-all pointer-events-auto cursor-pointer font-sans text-[16px] font-semibold"
@@ -1247,6 +1256,6 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
           <option key={c} value={c} />
         ))}
       </datalist>
-    </div>
+    </>
   );
 }

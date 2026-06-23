@@ -1,6 +1,6 @@
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, collection, doc, getDocs, writeBatch } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, getDocs, writeBatch } from 'firebase/firestore';
 import { mockAisles, mockProductsByAisle } from './data';
 
 const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
@@ -19,7 +19,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
 
 export async function bootstrapFirestore(force: boolean = false) {
   if (!isFirebaseConfigured) return;

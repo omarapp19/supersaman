@@ -280,7 +280,8 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
   };
 
   return (
-    <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+    <>
+      <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       <header className="mb-8">
         <h2 className="font-sans text-[32px] md:text-[48px] font-bold text-on-surface leading-tight tracking-tight">Configuración</h2>
         <p className="font-sans text-[16px] md:text-[18px] text-on-surface-variant mt-2">Personaliza parámetros de reabastecimiento, gestiona usuarios y administra bases de datos.</p>
@@ -534,8 +535,9 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
               <div><strong className="text-on-surface">Versión App:</strong> 1.4.2</div>
               <div><strong className="text-on-surface">Motor AI:</strong> Gemini-Flash-3.5-Saman</div>
             </div>
-          </div>
         </div>
+      </div>
+      </div>
       </div>
 
       {/* User Creation / Edit Modal */}
@@ -752,6 +754,6 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

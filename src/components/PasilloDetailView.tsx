@@ -89,17 +89,17 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
     setLoadingAllProducts(true);
     try {
       if (isFirebaseConfigured) {
-        const { collection, getDocs } = await import('firebase/firestore');
-        const promises = aisles.map(async (aisleItem) => {
-          const productsRef = collection(db, 'aisles', aisleItem.id, 'products');
-          const snap = await getDocs(productsRef);
-          return snap.docs.map(docSnap => ({
+        const { collectionGroup, getDocs } = await import('firebase/firestore');
+        const productsGroupRef = collectionGroup(db, 'products');
+        const snap = await getDocs(productsGroupRef);
+        const list = snap.docs.map(docSnap => {
+          const parentAisleDoc = docSnap.ref.parent.parent;
+          const aisleItem = aisles.find(a => a.id === parentAisleDoc?.id);
+          return {
             product: { id: docSnap.id, ...docSnap.data() } as Product,
-            aisle: aisleItem
-          }));
-        });
-        const results = await Promise.all(promises);
-        const list = results.flat();
+            aisle: aisleItem || { id: parentAisleDoc?.id || '', name: 'Pasillo', number: 0, status: 'unassigned', progress: 0 }
+          };
+        }).filter(item => item.aisle.number !== 0);
 
         if (typeof window !== 'undefined') {
           (window as any).__samanProductsCache = list;
@@ -372,7 +372,8 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
   });
 
   return (
-    <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-right-4 duration-500 pb-12">
+    <>
+      <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-right-4 duration-500 pb-12">
       {isOffline && (
         <div className="offline-banner w-full py-1.5 flex justify-center items-center gap-2 shadow-sm rounded-lg mb-4 animate-in fade-in slide-in-from-top-2">
           <CloudOff size={14} className="text-[#745815]" />
@@ -540,6 +541,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
             </>
           );
         })()}
+      </div>
       </div>
 
       {/* Product Creation Modal */}
@@ -716,6 +718,6 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
           <option key={c} value={c} />
         ))}
       </datalist>
-    </div>
+    </>
   );
 }

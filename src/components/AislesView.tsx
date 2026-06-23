@@ -45,17 +45,17 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDe
     setLoadingAllProducts(true);
     try {
       if (isFirebaseConfigured) {
-        const { collection, getDocs } = await import('firebase/firestore');
-        const promises = aisles.map(async (aisle) => {
-          const productsRef = collection(db, 'aisles', aisle.id, 'products');
-          const snap = await getDocs(productsRef);
-          return snap.docs.map(docSnap => ({
+        const { collectionGroup, getDocs } = await import('firebase/firestore');
+        const productsGroupRef = collectionGroup(db, 'products');
+        const snap = await getDocs(productsGroupRef);
+        const list = snap.docs.map(docSnap => {
+          const parentAisleDoc = docSnap.ref.parent.parent;
+          const aisleItem = aisles.find(a => a.id === parentAisleDoc?.id);
+          return {
             product: { id: docSnap.id, ...docSnap.data() },
-            aisle
-          }));
-        });
-        const results = await Promise.all(promises);
-        const list = results.flat();
+            aisle: aisleItem || { id: parentAisleDoc?.id || '', name: 'Pasillo', number: 0, status: 'unassigned', progress: 0 }
+          };
+        }).filter(item => item.aisle.number !== 0);
 
         if (typeof window !== 'undefined') {
           (window as any).__samanProductsCache = list;
@@ -126,18 +126,21 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDe
     if (list.length === 0) {
       try {
         if (isFirebaseConfigured) {
-          const { collection, getDocs } = await import('firebase/firestore');
-          const promises = aisles.map(async (aisle) => {
-            const productsRef = collection(db, 'aisles', aisle.id, 'products');
-            const snap = await getDocs(productsRef);
-            return snap.docs.map(doc => ({
-              product: { id: doc.id, ...doc.data() },
-              aisle
-            }));
-          });
-          const results = await Promise.all(promises);
-          list = results.flat();
+          const { collectionGroup, getDocs } = await import('firebase/firestore');
+          const productsGroupRef = collectionGroup(db, 'products');
+          const snap = await getDocs(productsGroupRef);
+          list = snap.docs.map(docSnap => {
+            const parentAisleDoc = docSnap.ref.parent.parent;
+            const aisleItem = aisles.find(a => a.id === parentAisleDoc?.id);
+            return {
+              product: { id: docSnap.id, ...docSnap.data() },
+              aisle: aisleItem || { id: parentAisleDoc?.id || '', name: 'Pasillo', number: 0, status: 'unassigned', progress: 0 }
+            };
+          }).filter(item => item.aisle.number !== 0);
           setAllProducts(list);
+          if (typeof window !== 'undefined') {
+            (window as any).__samanProductsCache = list;
+          }
         } else {
           const demoList: { product: any; aisle: Aisle }[] = [];
           aisles.forEach(aisle => {
@@ -241,7 +244,8 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDe
   };
 
   return (
-    <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+    <>
+      <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 mb-6">
         <div>
           <h2 className="font-sans text-[24px] md:text-[32px] text-on-surface font-bold">Seleccionar Pasillo</h2>
@@ -468,6 +472,7 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDe
           })}
         </section>
       )}
+      </div>
 
       {/* Add Aisle Modal */}
       {showAddModal && (
@@ -573,6 +578,6 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDe
           onClose={() => setShowGlobalScanner(false)}
         />
       )}
-    </div>
+    </>
   );
 }

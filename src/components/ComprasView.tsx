@@ -436,7 +436,8 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
   }
 
   return (
-    <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+    <>
+      <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       {/* SCREEN VIEW */}
       <div className="print-hide">
         {/* Header */}
@@ -954,6 +955,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
           </div>
         )}
       </div>
+      </div>
 
       {/* Detail Modal */}
       {selectedOrder && (
@@ -1232,7 +1234,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
       {showScrollTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-[84px] md:bottom-8 right-6 md:right-8 bg-primary text-white p-3.5 rounded-full shadow-[0_8px_30px_rgba(62,158,87,0.3)] hover:bg-primary/95 hover:scale-105 active:scale-95 transition-all duration-300 z-40 cursor-pointer print:hidden animate-in fade-in slide-in-from-bottom-4 flex items-center justify-center"
+          className="fixed bottom-[84px] md:bottom-8 right-6 md:right-8 bg-primary text-white p-3.5 rounded-full shadow-[0_8px_30px_rgba(62,158,87,0.3)] hover:bg-primary/95 hover:scale-105 active:scale-95 transition-all duration-300 z-40 cursor-pointer print:hidden animate-in fade-in slide-in-from-bottom-4 flex items-center justify-center transform-gpu"
           title="Subir al inicio"
         >
           <ArrowUp size={22} strokeWidth={2.5} />
@@ -1245,6 +1247,6 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
           <option key={c} value={c} />
         ))}
       </datalist>
-    </div>
+    </>
   );
 }
