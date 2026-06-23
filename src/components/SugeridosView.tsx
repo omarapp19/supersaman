@@ -20,7 +20,7 @@ interface DraftItem {
   brand: string;
   sku: string;
   suggestedQty: number;
-  unit: 'und' | 'cajas';
+  unit: 'und' | 'cajas' | 'kg';
   aisleNumber: number;
   status: 'normal' | 'bajo' | 'crítico';
   company?: string;
@@ -32,7 +32,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
   const [selectedAisle, setSelectedAisle] = useState<Aisle | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [units, setUnits] = useState<Record<string, 'und' | 'cajas'>>({});
+  const [units, setUnits] = useState<Record<string, 'und' | 'cajas' | 'kg'>>({});
   const [draft, setDraft] = useState<Record<string, DraftItem>>(() => {
     const stored = localStorage.getItem('saman_draft_sugeridos');
     if (stored) {
@@ -86,13 +86,8 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
-  // Product Editing States
-  const [editingProductId, setEditingProductId] = useState<string | null>(null);
-  const [tempValue, setTempValue] = useState<string>('');
-  const [tempSku, setTempSku] = useState<string>('');
-  const [tempCompany, setTempCompany] = useState<string>('');
-
-  // Product Creation States
+  // Product Editing & Creation States
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showProductModal, setShowProductModal] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
   const [productName, setProductName] = useState('');
@@ -100,6 +95,33 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
   const [productSku, setProductSku] = useState('');
   const [productUndXCaja, setProductUndXCaja] = useState('0');
   const [productCompany, setProductCompany] = useState('');
+  const [productSellingUnit, setProductSellingUnit] = useState<'und' | 'kg'>('und');
+
+  const handleStartEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setProductName(product.name);
+    setProductBrand(product.brand);
+    setProductSku(product.sku || '');
+    setProductCompany(product.company || '');
+    setProductUndXCaja(String(product.und_x_caja ?? 0));
+    setProductSellingUnit(product.sellingUnit || 'und');
+    setShowProductModal(true);
+  };
+
+  const handleCloseProductModal = () => {
+    setShowProductModal(false);
+    setEditingProduct(null);
+    setProductName('');
+    setProductBrand('');
+    setProductSku('');
+    setProductCompany('');
+    setProductUndXCaja('0');
+    setProductSellingUnit('und');
+  };
+
+  // Global search and cache states (declared before uniqueCompanies to avoid TDZ)
+  const [allProducts, setAllProducts] = useState<{ product: Product; aisle: Aisle }[]>([]);
+  const [loadingAllProducts, setLoadingAllProducts] = useState(false);
 
   // Computamos las empresas únicas para el autocompletado (datalist)
   const uniqueCompanies = useMemo(() => {
@@ -141,8 +163,6 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
 
   // Global search states (when on main screen)
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
-  const [allProducts, setAllProducts] = useState<{ product: Product; aisle: Aisle }[]>([]);
-  const [loadingAllProducts, setLoadingAllProducts] = useState(false);
 
   const fetchAllProducts = async () => {
     if (allProducts.length > 0 || loadingAllProducts) return;
@@ -408,7 +428,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
             if (draft[p.id]) {
               next[p.id] = draft[p.id].unit;
             } else if (next[p.id] === undefined) {
-              next[p.id] = 'und';
+              next[p.id] = p.sellingUnit === 'kg' ? 'kg' : 'und';
             }
           });
           return next;
@@ -446,40 +466,12 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
       setUnits(
         productsWithLocalData.reduce((acc, p) => ({
           ...acc,
-          [p.id]: draft[p.id] ? draft[p.id].unit : ('und' as const)
+          [p.id]: draft[p.id] ? draft[p.id].unit : (p.sellingUnit === 'kg' ? 'kg' : 'und' as const)
         }), {})
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAisle?.id, selectedAisle?.number]);
-
-  const handleUpdateProductDetails = async (productId: string, skuStr: string, undXCajaStr: string, companyStr: string) => {
-    const sku = skuStr.trim();
-    const val = parseInt(undXCajaStr, 10);
-    const und_x_caja = isNaN(val) ? 0 : Math.max(0, val);
-    const company = companyStr.trim();
-
-    try {
-      if (isFirebaseConfigured && selectedAisle?.id) {
-        const productRef = doc(db, 'aisles', selectedAisle.id, 'products', productId);
-        await setDoc(productRef, { sku, und_x_caja, company }, { merge: true });
-      } else {
-        // Mode demo: update local state and localStorage
-        setProducts(prev => prev.map(p => p.id === productId ? { ...p, sku, und_x_caja, company } : p));
-        localStorage.setItem(`saman_sku_${productId}`, sku);
-        localStorage.setItem(`saman_und_x_caja_${productId}`, String(und_x_caja));
-        localStorage.setItem(`saman_company_${productId}`, company);
-      }
-      if (typeof window !== 'undefined') {
-        (window as any).__samanProductsCache = null;
-      }
-      toast.success('Producto actualizado.');
-      setEditingProductId(null);
-    } catch (error) {
-      console.error("Error al actualizar producto:", error);
-      toast.error('Error al guardar. Intenta de nuevo.');
-    }
-  };
 
   const handleProductSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -490,38 +482,66 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
     const val = parseInt(productUndXCaja, 10);
     const und_x_caja = isNaN(val) ? 0 : Math.max(0, val);
 
-    const newProduct: Product = {
-      id: 'p_' + Date.now(),
-      name: productName.trim(),
-      brand: productBrand.trim(),
-      sku: productSku.trim(),
-      status: 'normal',
-      initials: initials,
-      und_x_caja: und_x_caja,
-      company: productCompany.trim()
-    };
-
     try {
-      if (isFirebaseConfigured && selectedAisle?.id) {
-        const productRef = doc(db, 'aisles', selectedAisle.id, 'products', newProduct.id);
-        await setDoc(productRef, newProduct);
+      if (editingProduct) {
+        // Edit Mode
+        const updatedFields: Partial<Product> = {
+          name: productName.trim(),
+          brand: productBrand.trim(),
+          sku: productSku.trim(),
+          und_x_caja,
+          company: productCompany.trim(),
+          sellingUnit: productSellingUnit,
+          initials
+        };
+
+        if (isFirebaseConfigured && selectedAisle?.id) {
+          const productRef = doc(db, 'aisles', selectedAisle.id, 'products', editingProduct.id);
+          await setDoc(productRef, updatedFields, { merge: true });
+        } else {
+          setProducts(prev => prev.map(p => p.id === editingProduct.id ? { ...p, ...updatedFields } : p));
+          localStorage.setItem(`saman_name_${editingProduct.id}`, updatedFields.name!);
+          localStorage.setItem(`saman_sku_${editingProduct.id}`, updatedFields.sku!);
+          localStorage.setItem(`saman_und_x_caja_${editingProduct.id}`, String(und_x_caja));
+          localStorage.setItem(`saman_company_${editingProduct.id}`, updatedFields.company!);
+        }
+        toast.success('Producto actualizado.');
       } else {
-        setProducts(prev => [...prev, newProduct].sort((a, b) => a.name.localeCompare(b.name)));
-        setQuantities(prev => ({ ...prev, [newProduct.id]: 0 }));
-        setUnits(prev => ({ ...prev, [newProduct.id]: 'und' }));
-        localStorage.setItem(`saman_sku_${newProduct.id}`, newProduct.sku);
-        if (und_x_caja > 0) {
-          localStorage.setItem(`saman_und_x_caja_${newProduct.id}`, String(und_x_caja));
+        // Create Mode
+        const newProduct: Product = {
+          id: 'p_' + Date.now(),
+          name: productName.trim(),
+          brand: productBrand.trim(),
+          sku: productSku.trim(),
+          status: 'normal',
+          initials: initials,
+          und_x_caja: und_x_caja,
+          company: productCompany.trim(),
+          sellingUnit: productSellingUnit
+        };
+
+        if (isFirebaseConfigured && selectedAisle?.id) {
+          const productRef = doc(db, 'aisles', selectedAisle.id, 'products', newProduct.id);
+          await setDoc(productRef, newProduct);
+        } else {
+          setProducts(prev => [...prev, newProduct].sort((a, b) => a.name.localeCompare(b.name)));
+          setQuantities(prev => ({ ...prev, [newProduct.id]: 0 }));
+          setUnits(prev => ({ ...prev, [newProduct.id]: productSellingUnit === 'kg' ? 'kg' : 'und' }));
+          localStorage.setItem(`saman_sku_${newProduct.id}`, newProduct.sku);
+          if (und_x_caja > 0) {
+            localStorage.setItem(`saman_und_x_caja_${newProduct.id}`, String(und_x_caja));
+          }
+          if (productCompany.trim()) {
+            localStorage.setItem(`saman_company_${newProduct.id}`, productCompany.trim());
+          }
         }
-        if (productCompany.trim()) {
-          localStorage.setItem(`saman_company_${newProduct.id}`, productCompany.trim());
-        }
+        toast.success('Producto agregado con éxito.');
       }
+
       if (typeof window !== 'undefined') {
         (window as any).__samanProductsCache = null;
       }
-      toast.success('Producto agregado con éxito.');
-      setShowProductModal(false);
+      handleCloseProductModal();
     } catch (error) {
       console.error("Error al guardar producto:", error);
       toast.error('Error al guardar el producto. Intenta de nuevo.');
@@ -539,7 +559,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
     updateDraftItem(id, { suggestedQty: newQty });
   };
 
-  const toggleUnit = (id: string, unit: 'und' | 'cajas') => {
+  const toggleUnit = (id: string, unit: 'und' | 'cajas' | 'kg') => {
     setUnits(prev => ({
       ...prev,
       [id]: unit
@@ -939,89 +959,23 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
 
                   <div className="flex flex-col justify-center overflow-hidden pr-2">
                     <h3 className="font-sans text-[16px] font-semibold text-[#281C19] leading-snug">{product.name}</h3>
-                    {editingProductId === product.id ? (
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <span className="font-mono text-[13px] text-[#4f6b53]">SKU:</span>
-                        <input
-                          type="text"
-                          value={tempSku}
-                          onChange={(e) => setTempSku(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleUpdateProductDetails(product.id, tempSku, tempValue, tempCompany);
-                            } else if (e.key === 'Escape') {
-                              setEditingProductId(null);
-                            }
-                          }}
-                          className="w-28 px-1.5 py-0.5 border border-primary rounded font-mono text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-white"
-                          autoFocus
-                        />
-                        <span className="font-mono text-[13px] text-[#4f6b53]">Caja:</span>
-                        <input
-                          type="number"
-                          value={tempValue}
-                          min="0"
-                          onChange={(e) => setTempValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleUpdateProductDetails(product.id, tempSku, tempValue, tempCompany);
-                            } else if (e.key === 'Escape') {
-                              setEditingProductId(null);
-                            }
-                          }}
-                          className="w-16 px-1.5 py-0.5 border border-primary rounded font-mono text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-white"
-                        />
-                        <span className="font-mono text-[13px] text-[#4f6b53]">Empresa:</span>
-                        <input
-                          type="text"
-                          list="companies-list"
-                          value={tempCompany}
-                          onChange={(e) => setTempCompany(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleUpdateProductDetails(product.id, tempSku, tempValue, tempCompany);
-                            } else if (e.key === 'Escape') {
-                              setEditingProductId(null);
-                            }
-                          }}
-                          placeholder="Empresa"
-                          className="w-28 px-1.5 py-0.5 border border-primary rounded font-sans text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-white"
-                        />
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-mono text-[13px] text-[#4f6b53]">
+                        {product.brand} • SKU: {product.sku || 'N/A'} • Caja: {product.und_x_caja ?? 0} und{product.company ? ` • Empresa: ${product.company}` : ''}{product.sellingUnit === 'kg' ? ' • Venta: Kg' : ''}
+                      </span>
+                      {(user?.role === 'operador' || user?.role === 'admin') && (
                         <button
-                          onClick={() => handleUpdateProductDetails(product.id, tempSku, tempValue, tempCompany)}
-                          className="px-2 py-0.5 bg-primary text-white rounded font-sans text-[11px] font-semibold hover:bg-primary/95 cursor-pointer"
+                          onClick={() => {
+                            handleStartEditProduct(product);
+                            fetchAllProducts(); // Carga las empresas en segundo plano
+                          }}
+                          className="text-primary hover:text-primary/70 transition-colors p-0.5 inline-flex items-center gap-0.5 cursor-pointer"
+                          title="Editar producto"
                         >
-                          Guardar
+                          <Pencil size={12} />
                         </button>
-                        <button
-                          onClick={() => setEditingProductId(null)}
-                          className="px-2 py-0.5 bg-white border border-outline-variant/50 rounded font-sans text-[11px] text-on-surface-variant hover:bg-surface-variant/50 cursor-pointer"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-mono text-[13px] text-[#4f6b53]">
-                          {product.brand} • SKU: {product.sku} • Caja: {product.und_x_caja ?? 0} und{product.company ? ` • Empresa: ${product.company}` : ''}
-                        </span>
-                        {(user?.role === 'operador' || user?.role === 'admin') && (
-                          <button
-                            onClick={() => {
-                              setEditingProductId(product.id);
-                              setTempSku(product.sku || '');
-                              setTempValue(String(product.und_x_caja ?? 0));
-                              setTempCompany(product.company || '');
-                              fetchAllProducts(); // Carga las empresas en segundo plano
-                            }}
-                            className="text-primary hover:text-primary/70 transition-colors p-0.5 inline-flex items-center gap-0.5 cursor-pointer"
-                            title="Editar producto"
-                          >
-                            <Pencil size={12} />
-                          </button>
-                        )}
-                      </div>
-                    )}
+                      )}
+                    </div>
                     
                     <div className="flex gap-1.5 mt-2">
                       <button 
@@ -1093,14 +1047,14 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
                   <div className="flex bg-surface-variant/40 rounded-full p-0.5 border border-outline-variant/20">
                     <button
                       type="button"
-                      onClick={() => toggleUnit(product.id, 'und')}
+                      onClick={() => toggleUnit(product.id, product.sellingUnit === 'kg' ? 'kg' : 'und')}
                       className={`px-3 py-1 rounded-full text-[11px] font-mono font-medium transition-colors cursor-pointer ${
-                        unit === 'und'
+                        unit === 'und' || unit === 'kg'
                           ? 'bg-primary text-white shadow-sm font-semibold'
                           : 'text-on-surface-variant hover:text-on-surface'
                       }`}
                     >
-                      Und
+                      {product.sellingUnit === 'kg' ? 'Kg' : 'Und'}
                     </button>
                     <button
                       type="button"
@@ -1146,16 +1100,18 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
 
       {/* Product Creation Modal */}
       {showProductModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowProductModal(false)}>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={handleCloseProductModal}>
           <div className="bg-card-surface rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center p-6 border-b border-outline-variant/20">
-              <h3 className="font-sans text-[20px] font-bold text-on-surface">Agregar Nuevo Producto</h3>
-              <button onClick={() => setShowProductModal(false)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-variant transition-colors cursor-pointer">
+              <h3 className="font-sans text-[20px] font-bold text-on-surface">
+                {editingProduct ? 'Editar Producto' : 'Agregar Nuevo Producto'}
+              </h3>
+              <button onClick={handleCloseProductModal} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-variant transition-colors cursor-pointer">
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleProductSubmit} className="p-6 flex flex-col gap-4">
+            <form onSubmit={handleProductSubmit} className="p-6 flex flex-col gap-4 max-h-[80vh] overflow-y-auto">
               <div className="flex flex-col gap-1.5">
                 <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Nombre del Producto</label>
                 <input 
@@ -1217,10 +1173,38 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
                 />
               </div>
 
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Unidad de Venta</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setProductSellingUnit('und')}
+                    className={`flex-1 py-2.5 rounded-xl border text-[13px] font-semibold transition-all cursor-pointer ${
+                      productSellingUnit === 'und'
+                        ? 'bg-primary text-white border-primary shadow-sm'
+                        : 'bg-white border-outline-variant text-on-surface hover:bg-surface-variant/20'
+                    }`}
+                  >
+                    Por Unidad (und)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProductSellingUnit('kg')}
+                    className={`flex-1 py-2.5 rounded-xl border text-[13px] font-semibold transition-all cursor-pointer ${
+                      productSellingUnit === 'kg'
+                        ? 'bg-primary text-white border-primary shadow-sm'
+                        : 'bg-white border-outline-variant text-on-surface hover:bg-surface-variant/20'
+                    }`}
+                  >
+                    Por Kilogramo (kg)
+                  </button>
+                </div>
+              </div>
+
               <div className="flex gap-3 mt-4">
                 <button 
                   type="button"
-                  onClick={() => setShowProductModal(false)}
+                  onClick={handleCloseProductModal}
                   className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer"
                 >
                   Cancelar
@@ -1228,9 +1212,14 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
                 <button 
                   type="submit"
                   disabled={savingProduct}
-                  className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                  className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {savingProduct ? 'Guardando...' : 'Crear Producto'}
+                  {savingProduct ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (editingProduct ? 'Guardar Cambios' : 'Crear Producto')}
                 </button>
               </div>
             </form>

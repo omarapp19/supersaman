@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, FormEvent } from 'react';
 import { ViewState, Aisle } from '../types';
-import { ClipboardList, Wine, Coffee, Milk, Plus, X, Trash2, Search, ScanBarcode } from 'lucide-react';
+import { ClipboardList, Wine, Coffee, Milk, Plus, X, Trash2, Search, ScanBarcode, Pencil } from 'lucide-react';
 import { BarcodeScanner } from './BarcodeScanner';
 import { useToast } from './Toast';
 import { db, isFirebaseConfigured } from '../firebase';
@@ -10,14 +10,16 @@ interface AislesViewProps {
   onNavigate: (view: ViewState, aisleNum?: number) => void;
   aisles: Aisle[];
   onAddAisle: (newAisle: Aisle) => void;
+  onUpdateAisle: (aisleId: string, updates: Partial<Aisle>) => void;
   onDeleteAisle: (aisleId: string) => void;
   user?: any;
   users?: any[];
 }
 
-export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle, user, users = [] }: AislesViewProps) {
+export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDeleteAisle, user, users = [] }: AislesViewProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [aisleToDelete, setAisleToDelete] = useState<Aisle | null>(null);
+  const [aisleToEdit, setAisleToEdit] = useState<Aisle | null>(null);
   const [aisleNumber, setAisleNumber] = useState('');
   const [aisleName, setAisleName] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -211,21 +213,30 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle, user
       return;
     }
 
-    if (aisles.some(a => a.number === num)) {
+    if (aisles.some(a => a.number === num && a.id !== aisleToEdit?.id)) {
       setError(`El pasillo número ${num} ya existe.`);
       return;
     }
 
-    const newAisle: Aisle = {
-      id: 'a_' + Date.now(),
-      number: num,
-      name: aisleName.trim(),
-      status: 'assigned',
-      progress: 0,
-      productsCount: 0
-    };
-
-    onAddAisle(newAisle);
+    if (aisleToEdit) {
+      onUpdateAisle(aisleToEdit.id, {
+        number: num,
+        name: aisleName.trim()
+      });
+      setAisleToEdit(null);
+      toast.success("Pasillo actualizado con éxito.");
+    } else {
+      const newAisle: Aisle = {
+        id: 'a_' + Date.now(),
+        number: num,
+        name: aisleName.trim(),
+        status: 'assigned',
+        progress: 0,
+        productsCount: 0
+      };
+      onAddAisle(newAisle);
+      toast.success("Pasillo guardado con éxito.");
+    }
     setShowAddModal(false);
   };
 
@@ -408,13 +419,28 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle, user
                       </div>
                     ) : null}
                     {!isOperator && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setAisleToDelete(aisle); }}
-                        className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-red-100 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
-                        title="Eliminar pasillo"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => {
+                            setAisleToEdit(aisle);
+                            setAisleNumber(String(aisle.number));
+                            setAisleName(aisle.name);
+                            setError(null);
+                            setShowAddModal(true);
+                          }}
+                          className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                          title="Editar pasillo"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          onClick={() => setAisleToDelete(aisle)}
+                          className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-red-100 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                          title="Eliminar pasillo"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -445,11 +471,13 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle, user
 
       {/* Add Aisle Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowAddModal(false)}>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => { setShowAddModal(false); setAisleToEdit(null); }}>
           <div className="bg-card-surface rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center p-6 border-b border-outline-variant/20">
-              <h3 className="font-sans text-[20px] font-bold text-on-surface">Agregar Nuevo Pasillo</h3>
-              <button onClick={() => setShowAddModal(false)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-variant transition-colors">
+              <h3 className="font-sans text-[20px] font-bold text-on-surface">
+                {aisleToEdit ? 'Editar Pasillo' : 'Agregar Nuevo Pasillo'}
+              </h3>
+              <button onClick={() => { setShowAddModal(false); setAisleToEdit(null); }} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-variant transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -487,12 +515,10 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle, user
                 />
               </div>
 
-
-
               <div className="flex gap-3 mt-4">
                 <button 
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => { setShowAddModal(false); setAisleToEdit(null); }}
                   className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all"
                 >
                   Cancelar
@@ -501,7 +527,7 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onDeleteAisle, user
                   type="submit"
                   className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all"
                 >
-                  Guardar Pasillo
+                  {aisleToEdit ? 'Guardar Cambios' : 'Guardar Pasillo'}
                 </button>
               </div>
             </form>

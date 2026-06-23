@@ -379,6 +379,18 @@ function AppContent() {
     }
   };
 
+  const handleUpdateAisle = async (aisleId: string, updates: Partial<Aisle>) => {
+    if (isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'aisles', aisleId), updates);
+      } catch (error) {
+        console.error("Error al actualizar pasillo en Firestore:", error);
+      }
+    } else {
+      setAisles(prev => prev.map(a => a.id === aisleId ? { ...a, ...updates } : a).sort((a, b) => a.number - b.number));
+    }
+  };
+
   const handleDeleteAisle = async (aisleId: string) => {
     if (isFirebaseConfigured) {
       try {
@@ -455,7 +467,7 @@ function AppContent() {
           <PanelView onNavigate={navigateToView} aisles={aisles} orders={orders} checkedOrders={checkedOrders} />
         )}
         {currentView === 'pasillos' && (
-          <AislesView onNavigate={navigateToView} aisles={aisles} onAddAisle={handleAddAisle} onDeleteAisle={handleDeleteAisle} user={user} users={users} />
+          <AislesView onNavigate={navigateToView} aisles={aisles} onAddAisle={handleAddAisle} onUpdateAisle={handleUpdateAisle} onDeleteAisle={handleDeleteAisle} user={user} users={users} />
         )}
         {currentView === 'pasillo-detail' && (
           <PasilloDetailView 

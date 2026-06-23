@@ -19,6 +19,7 @@ export interface Product {
   initials?: string;
   und_x_caja?: number;
   company?: string;
+  sellingUnit?: 'und' | 'kg';
 }
 
 export interface OrderItem {
@@ -27,7 +28,7 @@ export interface OrderItem {
   brand: string;
   sku: string;
   suggestedQty: number;
-  unit: 'cajas' | 'und';
+  unit: 'cajas' | 'und' | 'kg';
   aisle: number;
   user: string;
   status: 'normal' | 'bajo' | 'crítico';
@@ -36,4 +37,5 @@ export interface OrderItem {
   company?: string;
   und_x_caja?: number;
 }
+
 
