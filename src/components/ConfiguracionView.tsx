@@ -103,117 +103,6 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
     }
   };
 
-  const handleImportJson = async () => {
-    setDbActionLoading(true);
-    setDbMessage(null);
-    try {
-      const response = await fetch('/datos act.json');
-      if (!response.ok) {
-        throw new Error('No se pudo leer el archivo datos act.json. Asegúrate de que esté en la carpeta public.');
-      }
-      const jsonData = await response.json();
-      
-      let aisleCount = 0;
-      let productCount = 0;
-
-      // Dynamically map all sections in the JSON file
-      const keys = Object.keys(jsonData);
-      const aisleMapping: Record<string, { number: number; id: string; name: string }> = {};
-      keys.forEach((key, index) => {
-        const number = index + 1;
-        aisleMapping[key] = {
-          number: number,
-          id: `a_${number}`,
-          name: key
-        };
-      });
-
-      if (isFirebaseConfigured) {
-        const { writeBatch, collection, doc } = await import('firebase/firestore');
-        let batch = writeBatch(db);
-        let batchSize = 0;
-
-        for (const [key, items] of Object.entries(jsonData)) {
-          if (!/PASILLO\s*(N[°º])?\s*\b[89]\b/i.test(key)) continue;
-          const mapping = aisleMapping[key];
-          if (!mapping) continue;
-          const aisleNumber = mapping.number;
-          const aisleName = mapping.name;
-          const aisleId = mapping.id;
-
-          const aisleRef = doc(db, 'aisles', aisleId);
-          batch.set(aisleRef, {
-            id: aisleId,
-            number: aisleNumber,
-            name: aisleName,
-            status: 'unassigned',
-            progress: 0,
-            productsCount: (items as any[]).length
-          });
-          batchSize++;
-          aisleCount++;
-
-          const freshProducts = mockProductsByAisle[aisleNumber] || [];
-
-          for (let i = 0; i < (items as any[]).length; i++) {
-            const item = (items as any[])[i];
-            const matched = freshProducts.find(p => p.name === item.producto);
-            const productId = matched?.id || `p_${aisleNumber}_${i}`;
-            const initials = matched?.initials || item.producto.substring(0, 2).toUpperCase();
-
-            const productRef = doc(db, `aisles/${aisleId}/products`, productId);
-            batch.set(productRef, {
-              id: productId,
-              name: item.producto,
-              brand: matched?.brand || '',
-              sku: matched?.sku || '',
-              status: matched?.status || 'normal',
-              initials,
-              und_x_caja: item.und_x_caja || 0
-            });
-            batchSize++;
-            productCount++;
-
-            if (batchSize >= 400) {
-              await batch.commit();
-              batch = writeBatch(db);
-              batchSize = 0;
-            }
-          }
-        }
-
-        if (batchSize > 0) {
-          await batch.commit();
-        }
-      } else {
-        for (const [key, items] of Object.entries(jsonData)) {
-          if (!/PASILLO\s*(N[°º])?\s*\b[89]\b/i.test(key)) continue;
-          const mapping = aisleMapping[key];
-          if (!mapping) continue;
-          const aisleNumber = mapping.number;
-          const freshProducts = mockProductsByAisle[aisleNumber] || [];
-
-          for (let i = 0; i < (items as any[]).length; i++) {
-            const item = (items as any[])[i];
-            const matched = freshProducts.find(p => p.name === item.producto);
-            const productId = matched?.id || `p_${aisleNumber}_${i}`;
-            localStorage.setItem(`saman_und_x_caja_${productId}`, String(item.und_x_caja || 0));
-            productCount++;
-          }
-          aisleCount++;
-        }
-      }
-
-      toast.success(`Importación exitosa: ${aisleCount} pasillos y ${productCount} productos sincronizados.`);
-      setDbMessage(`Importación exitosa: ${aisleCount} pasillos y ${productCount} productos sincronizados.`);
-    } catch (error) {
-      toast.error('Error al importar datos: ' + (error as Error).message);
-      setDbMessage('Error al importar datos.');
-    } finally {
-      setDbActionLoading(false);
-    }
-  };
-
   const handleUserSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
@@ -370,67 +259,83 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
               </button>
             </div>
 
-            <div className="overflow-x-auto border border-outline-variant/20 rounded-2xl bg-white/50">
-              <table className="w-full text-left border-collapse min-w-[500px]">
-                <thead>
-                  <tr className="border-b border-outline-variant/30 text-on-surface-variant/80 font-mono text-[11px] uppercase tracking-wider bg-surface-variant/10">
-                    <th className="py-3.5 px-4 font-semibold">Usuario</th>
-                    <th className="py-3.5 px-4 font-semibold">Rol</th>
-                    <th className="py-3.5 px-4 font-semibold">Pasillos Asignados</th>
-                    <th className="py-3.5 px-4 font-semibold text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="font-sans text-[14px] text-on-surface">
-                  {users.map((u) => (
-                    <tr key={u.id} className="border-b border-outline-variant/10 hover:bg-surface-variant/10 transition-colors">
-                      <td className="py-3.5 px-4 flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[13px]">
-                          {u.fullName.substring(0, 2).toUpperCase()}
+            <div className="flex flex-col gap-3">
+              {users.map((u) => {
+                const avatarColorClass = 
+                  u.role === 'admin' 
+                    ? 'from-primary/20 to-primary/5 text-primary' 
+                    : u.role === 'supervisor'
+                      ? 'from-blue-500/20 to-blue-500/5 text-blue-700'
+                      : 'from-amber-500/20 to-amber-500/5 text-amber-700';
+
+                return (
+                  <div 
+                    key={u.id} 
+                    className="bg-white/60 hover:bg-white border border-outline-variant/20 hover:border-primary/30 p-4 rounded-2xl flex flex-col sm:flex-row justify-between sm:items-center gap-4 transition-all duration-300 shadow-sm hover:shadow-[0_8px_30px_rgba(40,28,25,0.03)] group"
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* Avatar */}
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-[15px] shadow-inner bg-gradient-to-br ${avatarColorClass}`}>
+                        {u.fullName.substring(0, 2).toUpperCase()}
+                      </div>
+                      
+                      {/* User Info */}
+                      <div className="flex flex-col">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-sans text-[16px] font-bold text-on-surface">{u.fullName}</span>
+                          {u.role === 'admin' && <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full font-mono text-[10px] font-bold uppercase border border-primary/20">Admin</span>}
+                          {u.role === 'supervisor' && <span className="px-2 py-0.5 bg-blue-500/10 text-blue-700 rounded-full font-mono text-[10px] font-bold uppercase border border-blue-500/20">Supervisor</span>}
+                          {u.role === 'operador' && <span className="px-2 py-0.5 bg-amber-500/10 text-amber-700 rounded-full font-mono text-[10px] font-bold uppercase border border-amber-500/20">Operador</span>}
                         </div>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-on-surface leading-tight">{u.fullName}</span>
-                          <span className="font-mono text-[11px] text-on-surface-variant">@{u.username}</span>
+                        <span className="font-mono text-[12px] text-on-surface-variant">@{u.username}</span>
+                        
+                        {/* Assigned Aisles */}
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {u.assignedAisles && u.assignedAisles.length > 0 ? (
+                            u.assignedAisles.map((num: number) => (
+                              <span 
+                                key={num} 
+                                className="px-2 py-0.5 bg-primary/5 text-primary border border-primary/10 rounded-md font-sans text-[11px] font-medium"
+                              >
+                                Pasillo {num}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="font-sans text-[11px] text-on-surface-variant/50 italic">Sin pasillos asignados</span>
+                          )}
                         </div>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        {u.role === 'admin' && <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full font-mono text-[10px] font-bold uppercase border border-primary/20">Admin</span>}
-                        {u.role === 'supervisor' && <span className="px-2 py-0.5 bg-blue-500/10 text-blue-700 rounded-full font-mono text-[10px] font-bold uppercase border border-blue-500/20">Supervisor</span>}
-                        {u.role === 'operador' && <span className="px-2 py-0.5 bg-amber-500/10 text-amber-700 rounded-full font-mono text-[10px] font-bold uppercase border border-amber-500/20">Operador</span>}
-                      </td>
-                      <td className="py-3.5 px-4 font-mono text-[13px] text-on-surface-variant">
-                        {u.assignedAisles && u.assignedAisles.length > 0
-                          ? u.assignedAisles.map((num: number) => `Pasillo ${num}`).join(', ')
-                          : 'Ninguno'}
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex justify-end gap-1.5">
-                          <button
-                            onClick={() => {
-                              setEditingUserId(u.id);
-                              setUserFullName(u.fullName);
-                              setUserUsername(u.username);
-                              setUserRole(u.role);
-                              setUserAisles(u.assignedAisles || []);
-                              setShowUserModal(true);
-                            }}
-                            className="p-1.5 rounded-lg text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
-                            title="Editar Usuario"
-                          >
-                            <Edit size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUserClick(u.id, u.username)}
-                            className="p-1.5 rounded-lg text-on-surface-variant hover:bg-error/10 hover:text-error transition-colors cursor-pointer"
-                            title="Eliminar Usuario"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 sm:self-center self-end border-t sm:border-t-0 border-outline-variant/10 pt-3 sm:pt-0 w-full sm:w-auto justify-end">
+                      <button
+                        onClick={() => {
+                          setEditingUserId(u.id);
+                          setUserFullName(u.fullName);
+                          setUserUsername(u.username);
+                          setUserRole(u.role);
+                          setUserAisles(u.assignedAisles || []);
+                          setShowUserModal(true);
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-all font-sans text-[12px] font-semibold cursor-pointer border border-transparent hover:border-primary/20"
+                        title="Editar Usuario"
+                      >
+                        <Edit size={14} />
+                        <span>Editar</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUserClick(u.id, u.username)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-on-surface-variant hover:bg-error/10 hover:text-error transition-all font-sans text-[12px] font-semibold cursor-pointer border border-transparent hover:border-error/20"
+                        title="Eliminar Usuario"
+                      >
+                        <Trash2 size={14} />
+                        <span>Eliminar</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -454,15 +359,6 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
               >
                 <Trash2 size={16} />
                 {dbActionLoading ? 'Limpiando...' : 'Vaciar Base de Datos'}
-              </button>
-
-              <button
-                onClick={handleImportJson}
-                disabled={dbActionLoading}
-                className="flex-1 bg-primary/10 text-primary hover:bg-primary/20 rounded-full py-3.5 font-sans text-[14px] font-semibold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-              >
-                <RefreshCw size={16} />
-                {dbActionLoading ? 'Importando...' : 'Importar Pasillo 8 y 9 (datos act.json)'}
               </button>
 
               <button
