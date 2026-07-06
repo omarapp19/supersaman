@@ -74,6 +74,8 @@ export interface DiagramElement {
   x: number;
   y: number;
   rotation: number;
+  width?: number;
+  height?: number;
 }
 
 export interface PurchaseOrder {

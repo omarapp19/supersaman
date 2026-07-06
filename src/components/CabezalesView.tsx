@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, Fragment, FormEvent } from 'react';
-import { Plus, X, Trash2, MapPin, Building2, History, Rows3, RotateCw } from 'lucide-react';
+import { Plus, X, Trash2, MapPin, Building2, History, Rows3, RotateCw, Copy, Clipboard as ClipboardIcon } from 'lucide-react';
 import { Aisle, Cabezal, CabezalPago, PaymentType, DiagramElement } from '../types';
 import { db, isFirebaseConfigured } from '../firebase';
 import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
@@ -61,6 +61,15 @@ function isPaidForCurrentPeriod(cabezal: Cabezal): boolean {
   return cabezal.lastPaidPeriod === getBillingPeriodLabel();
 }
 
+// Every diagram box shares the same fixed footprint; scale the font down for longer
+// labels instead of truncating so the full name still fits inside it.
+function getDiagramLabelSizeClass(label: string): string {
+  if (label.length <= 10) return 'text-[9.5px]';
+  if (label.length <= 18) return 'text-[8.5px]';
+  if (label.length <= 28) return 'text-[7.5px]';
+  return 'text-[6.5px]';
+}
+
 function loadLocalPagos(cabezalId: string): CabezalPago[] {
   try {
     const raw = localStorage.getItem(`saman_cabezal_pagos_${cabezalId}`);
@@ -120,8 +129,15 @@ export function CabezalesView({ cabezales, aisles, onAddCabezal, onUpdateCabezal
     }
   };
 
-  const handleAddElement = () => {
-    const newElement: DiagramElement = { id: 'el_' + Date.now(), x: 50, y: 50, rotation: 0 };
+  const handleAddElement = (customProps?: Partial<DiagramElement>) => {
+    const newElement: DiagramElement = {
+      id: 'el_' + Date.now(),
+      x: customProps?.x ?? 50,
+      y: customProps?.y ?? 50,
+      rotation: customProps?.rotation ?? 0,
+      ...(customProps?.width !== undefined ? { width: customProps.width } : {}),
+      ...(customProps?.height !== undefined ? { height: customProps.height } : {}),
+    };
     persistElements([...elements, newElement]);
   };
 
@@ -210,6 +226,7 @@ export function CabezalesView({ cabezales, aisles, onAddCabezal, onUpdateCabezal
             elements={elements}
             onAddElement={handleAddElement}
             onUpdateElement={handleUpdateElement}
+            onUpdateAllElements={persistElements}
             onDeleteElement={handleDeleteElement}
           />
         )}
@@ -700,48 +717,170 @@ function ConfirmDeleteModal({ cabezal, onCancel, onConfirm }: { cabezal: Cabezal
   );
 }
 
-function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onAddElement, onUpdateElement, onDeleteElement }: {
+function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onAddElement, onUpdateElement, onUpdateAllElements, onDeleteElement }: {
   cabezales: Cabezal[];
   onUpdateCabezal: (id: string, updates: Partial<Cabezal>) => void;
   onOpenDetail: (cabezal: Cabezal) => void;
   elements: DiagramElement[];
-  onAddElement: () => void;
+  onAddElement: (customProps?: Partial<DiagramElement>) => void;
   onUpdateElement: (id: string, updates: Partial<DiagramElement>) => void;
+  onUpdateAllElements: (allElements: DiagramElement[]) => void;
   onDeleteElement: (id: string) => void;
 }) {
+  const toast = useToast();
   const containerRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ type: 'cabezal' | 'element'; id: string } | null>(null);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const selectedElement = elements.find(el => el.id === selectedElementId);
+  const [copiedConfig, setCopiedConfig] = useState<{ width?: number; height?: number; rotation: number } | null>(null);
+  const [isAllSelected, setIsAllSelected] = useState(false);
   const movedRef = useRef(false);
+  const draggedStartPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const dragStartPositionsRef = useRef<{
+    elements: { id: string; x: number; y: number }[];
+    cabezales: { id: string; x: number; y: number }[];
+  }>({ elements: [], cabezales: [] });
+
+  // Snapping options
+  const [snapToGrid, setSnapToGrid] = useState<boolean>(() => {
+    const saved = localStorage.getItem('saman_cabezales_snap_grid');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [snapToElements, setSnapToElements] = useState<boolean>(() => {
+    const saved = localStorage.getItem('saman_cabezales_snap_elements');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  // Alignment guide coordinates
+  const [activeGuideX, setActiveGuideX] = useState<number | null>(null);
+  const [activeGuideY, setActiveGuideY] = useState<number | null>(null);
+
+  const toggleSnapToGrid = () => {
+    setSnapToGrid(prev => {
+      const next = !prev;
+      localStorage.setItem('saman_cabezales_snap_grid', String(next));
+      return next;
+    });
+  };
+
+  const toggleSnapToElements = () => {
+    setSnapToElements(prev => {
+      const next = !prev;
+      localStorage.setItem('saman_cabezales_snap_elements', String(next));
+      return next;
+    });
+  };
 
   const handlePointerDown = (e: any, type: 'cabezal' | 'element', id: string, x: number, y: number) => {
     try {
       e.target.setPointerCapture?.(e.pointerId);
     } catch {
-      // ignore: pointer capture isn't essential, just a smoothing optimization for the drag
+      // ignore
     }
     setDrag({ type, id });
     movedRef.current = false;
     setDragPos({ x, y });
+    draggedStartPosRef.current = { x, y };
+    dragStartPositionsRef.current = {
+      elements: elements.map(el => ({ id: el.id, x: el.x, y: el.y })),
+      cabezales: cabezales.map(c => ({ id: c.id, x: c.positionX ?? 50, y: c.positionY ?? 50 }))
+    };
   };
 
   const handlePointerMove = (e: any) => {
     if (!drag || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const x = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
-    const y = Math.min(100, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100));
+    
+    // Calculate raw percentage coordinates inside the canvas container
+    const rawX = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
+    const rawY = Math.min(100, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100));
+
+    let snappedX = rawX;
+    let snappedY = rawY;
+    let guideX: number | null = null;
+    let guideY: number | null = null;
+    const threshold = 1.5; // Alignment snapping distance threshold in percentage
+
+    if (snapToElements) {
+      const others: { x: number; y: number }[] = [];
+      
+      cabezales.forEach(c => {
+        if (drag.type !== 'cabezal' || drag.id !== c.id) {
+          others.push({ x: c.positionX ?? 50, y: c.positionY ?? 50 });
+        }
+      });
+      
+      elements.forEach(el => {
+        if (drag.type !== 'element' || drag.id !== el.id) {
+          others.push({ x: el.x, y: el.y });
+        }
+      });
+
+      // Check alignment vertically (same X)
+      const alignX = others.find(o => Math.abs(o.x - rawX) < threshold);
+      if (alignX) {
+        snappedX = alignX.x;
+        guideX = alignX.x;
+      }
+
+      // Check alignment horizontally (same Y)
+      const alignY = others.find(o => Math.abs(o.y - rawY) < threshold);
+      if (alignY) {
+        snappedY = alignY.y;
+        guideY = alignY.y;
+      }
+    }
+
+    if (snapToGrid) {
+      const gridStep = 2.5; // Snap to 2.5% multiples
+      if (guideX === null) {
+        snappedX = Math.round(snappedX / gridStep) * gridStep;
+      }
+      if (guideY === null) {
+        snappedY = Math.round(snappedY / gridStep) * gridStep;
+      }
+    }
+
     movedRef.current = true;
-    setDragPos({ x, y });
+    setDragPos({ x: snappedX, y: snappedY });
+    setActiveGuideX(guideX);
+    setActiveGuideY(guideY);
   };
 
   const handlePointerUp = () => {
     if (drag && dragPos) {
       if (movedRef.current) {
-        if (drag.type === 'cabezal') {
-          onUpdateCabezal(drag.id, { positionX: dragPos.x, positionY: dragPos.y });
+        if (isAllSelected) {
+          const dx = dragPos.x - draggedStartPosRef.current.x;
+          const dy = dragPos.y - draggedStartPosRef.current.y;
+          
+          const nextElements = elements.map(el => {
+            const start = dragStartPositionsRef.current.elements.find(item => item.id === el.id);
+            if (start) {
+              return {
+                ...el,
+                x: Math.min(100, Math.max(0, start.x + dx)),
+                y: Math.min(100, Math.max(0, start.y + dy))
+              };
+            }
+            return el;
+          });
+          onUpdateAllElements(nextElements);
+
+          dragStartPositionsRef.current.cabezales.forEach(c => {
+            const nextX = Math.min(100, Math.max(0, c.x + dx));
+            const nextY = Math.min(100, Math.max(0, c.y + dy));
+            onUpdateCabezal(c.id, { positionX: nextX, positionY: nextY });
+          });
+
+          toast.success('Elementos movidos en bloque.');
         } else {
-          onUpdateElement(drag.id, { x: dragPos.x, y: dragPos.y });
+          if (drag.type === 'cabezal') {
+            onUpdateCabezal(drag.id, { positionX: dragPos.x, positionY: dragPos.y });
+          } else {
+            onUpdateElement(drag.id, { x: dragPos.x, y: dragPos.y });
+          }
         }
       } else if (drag.type === 'cabezal') {
         const cab = cabezales.find(c => c.id === drag.id);
@@ -752,6 +891,8 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
     }
     setDrag(null);
     setDragPos(null);
+    setActiveGuideX(null);
+    setActiveGuideY(null);
   };
 
   const handleBackgroundPointerDown = (e: any) => {
@@ -765,14 +906,81 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
   return (
     <div className="bg-card-surface rounded-3xl p-4 shadow-[0_4px_20px_rgba(40,28,25,0.05)]">
       <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
-        <p className="font-mono text-[11px] sm:text-[12px] text-on-surface-variant uppercase tracking-wider">Arrastra cabezales y estantes para armar el plano de la tienda</p>
-        <button
-          onClick={onAddElement}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-surface-variant/50 hover:bg-surface-variant text-on-surface rounded-full font-sans text-[12.5px] font-semibold transition-all cursor-pointer flex-shrink-0"
-        >
-          <Rows3 size={14} />
-          Agregar Estante
-        </button>
+        <p className="font-mono text-[11px] sm:text-[12px] text-on-surface-variant uppercase tracking-wider">
+          Arrastra cabezales y estantes para armar el plano de la tienda
+        </p>
+        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+          <button
+            onClick={toggleSnapToGrid}
+            className={`px-3 py-1.5 rounded-full font-sans text-[12px] font-semibold transition-all border cursor-pointer ${
+              snapToGrid 
+                ? 'bg-primary/10 text-primary border-primary/30 hover:bg-primary/20' 
+                : 'bg-white text-on-surface-variant border-outline-variant/30 hover:bg-surface-variant/30'
+            }`}
+            title="Ajustar a cuadrícula de puntos"
+          >
+            Cuadrícula
+          </button>
+          <button
+            onClick={toggleSnapToElements}
+            className={`px-3 py-1.5 rounded-full font-sans text-[12px] font-semibold transition-all border cursor-pointer ${
+              snapToElements 
+                ? 'bg-primary/10 text-primary border-primary/30 hover:bg-primary/20' 
+                : 'bg-white text-on-surface-variant border-outline-variant/30 hover:bg-surface-variant/30'
+            }`}
+            title="Alineación magnética con otros elementos"
+          >
+            Alineación
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsAllSelected(prev => {
+                const next = !prev;
+                if (next) {
+                  setSelectedElementId(null);
+                }
+                return next;
+              });
+            }}
+            className={`px-3 py-1.5 rounded-full font-sans text-[12px] font-semibold transition-all border cursor-pointer ${
+              isAllSelected 
+                ? 'bg-primary/20 text-primary border-primary hover:bg-primary/30' 
+                : 'bg-white text-on-surface-variant border-outline-variant/30 hover:bg-surface-variant/30'
+            }`}
+            title="Seleccionar todos los estantes y cabezales para arrastrar en bloque"
+          >
+            {isAllSelected ? 'Deseleccionar Todo' : 'Seleccionar Todo'}
+          </button>
+          {copiedConfig && (
+            <button
+              type="button"
+              onClick={() => {
+                onAddElement({
+                  width: copiedConfig.width,
+                  height: copiedConfig.height,
+                  rotation: copiedConfig.rotation,
+                  x: 50,
+                  y: 50
+                });
+                toast.success('Estante pegado en el centro.');
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-secondary text-white hover:bg-secondary/95 rounded-full font-sans text-[12.5px] font-semibold transition-all shadow-sm cursor-pointer animate-in fade-in zoom-in duration-200"
+              title="Pegar estante con la configuración copiada"
+            >
+              <ClipboardIcon size={14} />
+              Pegar Estante
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onAddElement()}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[12.5px] font-semibold transition-all shadow-sm cursor-pointer"
+          >
+            <Rows3 size={14} />
+            Agregar Estante
+          </button>
+        </div>
       </div>
 
       {isEmpty ? (
@@ -780,24 +988,69 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
           <p className="font-sans text-[15px] text-on-surface-variant">Crea un cabezal o agrega un estante para empezar a armar el plano.</p>
         </div>
       ) : (
-        <div
-          ref={containerRef}
-          onPointerMove={handlePointerMove}
-          onPointerDown={handleBackgroundPointerDown}
-          className="relative w-full aspect-[16/10] bg-surface-variant/20 rounded-2xl border-2 border-dashed border-outline-variant/40 touch-none select-none overflow-hidden"
-        >
+        <div className="w-full overflow-auto max-h-[80vh] border border-outline-variant/30 rounded-2xl bg-surface-variant/10 shadow-inner">
+          <div
+            ref={containerRef}
+            onPointerMove={handlePointerMove}
+            onPointerDown={handleBackgroundPointerDown}
+            className="relative w-[1000px] h-[625px] bg-surface-variant/20 select-none overflow-hidden"
+            style={snapToGrid ? {
+              backgroundImage: 'radial-gradient(circle, rgba(62, 158, 87, 0.15) 1.5px, transparent 1.5px)',
+              backgroundSize: '2.5% 2.5%'
+            } : {}}
+          >
+          {/* Alignment guide lines */}
+          {activeGuideX !== null && (
+            <div
+              style={{ left: `${activeGuideX}%` }}
+              className="absolute top-0 bottom-0 w-[1.5px] border-l border-dashed border-red-500 pointer-events-none z-20"
+            />
+          )}
+          {activeGuideY !== null && (
+            <div
+              style={{ top: `${activeGuideY}%` }}
+              className="absolute left-0 right-0 h-[1.5px] border-t border-dashed border-red-500 pointer-events-none z-20"
+            />
+          )}
+
           {elements.map(el => {
-            const isDragging = drag?.type === 'element' && drag.id === el.id;
-            const x = isDragging && dragPos ? dragPos.x : el.x;
-            const y = isDragging && dragPos ? dragPos.y : el.y;
+            let x = el.x;
+            let y = el.y;
+            if (drag && dragPos) {
+              if (isAllSelected) {
+                const startPos = dragStartPositionsRef.current.elements.find(item => item.id === el.id);
+                if (startPos) {
+                  const dx = dragPos.x - draggedStartPosRef.current.x;
+                  const dy = dragPos.y - draggedStartPosRef.current.y;
+                  x = Math.min(100, Math.max(0, startPos.x + dx));
+                  y = Math.min(100, Math.max(0, startPos.y + dy));
+                }
+              } else if (drag.type === 'element' && drag.id === el.id) {
+                x = dragPos.x;
+                y = dragPos.y;
+              }
+            }
             const isSelected = selectedElementId === el.id;
+            const showActiveHighlight = isSelected || isAllSelected;
             return (
               <div
                 key={el.id}
                 onPointerDown={(e) => handlePointerDown(e, 'element', el.id, el.x, el.y)}
                 onPointerUp={handlePointerUp}
-                style={{ left: `${x}%`, top: `${y}%`, transform: `translate(-50%, -50%) rotate(${el.rotation}deg)` }}
-                className={`absolute w-20 h-8 sm:w-24 sm:h-9 bg-primary/10 border-2 rounded-md shadow-sm cursor-grab active:cursor-grabbing flex items-center justify-center ${isSelected ? 'border-primary' : 'border-primary/40'}`}
+                style={{
+                  left: `${x}%`,
+                  top: `${y}%`,
+                  transform: `translate(-50%, -50%) rotate(${el.rotation}deg)`,
+                  width: el.width !== undefined ? `${el.width}px` : undefined,
+                  height: el.height !== undefined ? `${el.height}px` : undefined,
+                }}
+                className={`absolute bg-primary/10 border-2 rounded-md shadow-sm cursor-grab active:cursor-grabbing touch-none flex items-center justify-center ${
+                  showActiveHighlight ? 'border-primary ring-2 ring-primary/20 bg-primary/20' : 'border-primary/40'
+                } ${
+                  el.width !== undefined ? '' : 'w-20 sm:w-24'
+                } ${
+                  el.height !== undefined ? '' : 'h-8 sm:h-9'
+                }`}
               >
                 {isSelected && (
                   <>
@@ -825,10 +1078,23 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
             );
           })}
 
-          {cabezales.map(cab => {
-            const isDragging = drag?.type === 'cabezal' && drag.id === cab.id;
-            const x = isDragging && dragPos ? dragPos.x : (cab.positionX ?? 50);
-            const y = isDragging && dragPos ? dragPos.y : (cab.positionY ?? 50);
+           {cabezales.map(cab => {
+            let x = cab.positionX ?? 50;
+            let y = cab.positionY ?? 50;
+            if (drag && dragPos) {
+              if (isAllSelected) {
+                const startPos = dragStartPositionsRef.current.cabezales.find(item => item.id === cab.id);
+                if (startPos) {
+                  const dx = dragPos.x - draggedStartPosRef.current.x;
+                  const dy = dragPos.y - draggedStartPosRef.current.y;
+                  x = Math.min(100, Math.max(0, startPos.x + dx));
+                  y = Math.min(100, Math.max(0, startPos.y + dy));
+                }
+              } else if (drag.type === 'cabezal' && drag.id === cab.id) {
+                x = dragPos.x;
+                y = dragPos.y;
+              }
+            }
             const isRented = !!cab.tenantCompany;
             return (
               <button
@@ -836,15 +1102,153 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
                 onPointerDown={(e) => handlePointerDown(e, 'cabezal', cab.id, cab.positionX ?? 50, cab.positionY ?? 50)}
                 onPointerUp={handlePointerUp}
                 style={{ left: `${x}%`, top: `${y}%` }}
-                className={`absolute -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center justify-center w-20 h-14 sm:w-24 sm:h-16 rounded-xl border-2 shadow-md cursor-grab active:cursor-grabbing font-sans text-[11px] font-bold px-1 text-center transition-colors ${
+                className={`absolute -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center justify-center w-16 h-11 sm:w-20 sm:h-14 rounded-lg border-2 shadow-md cursor-grab active:cursor-grabbing touch-none font-sans font-bold px-1 py-0.5 text-center transition-colors overflow-hidden ${
                   isRented ? 'bg-primary/10 border-primary text-primary' : 'bg-white border-outline-variant/50 text-on-surface-variant'
-                }`}
+                } ${isAllSelected ? 'ring-2 ring-primary border-primary bg-primary/10' : ''}`}
               >
-                <span className="truncate w-full">{cab.label}</span>
-                <span className="font-mono text-[9px] font-normal opacity-70 truncate w-full">{isRented ? cab.tenantCompany : 'Vacante'}</span>
+                <span className={`w-full leading-tight break-words ${getDiagramLabelSizeClass(cab.label)}`}>{cab.label}</span>
+                <span className="w-full font-mono text-[7px] font-normal opacity-70 leading-none truncate mt-0.5">{isRented ? cab.tenantCompany : 'Vacante'}</span>
               </button>
             );
           })}
+          </div>
+        </div>
+      )}
+
+      {selectedElement && (
+        <div className="mt-4 p-4 bg-white/70 border border-outline-variant/30 backdrop-blur-md rounded-2xl flex flex-wrap items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex flex-col gap-0.5">
+            <span className="font-sans text-[14px] sm:text-[15px] font-bold text-on-surface flex items-center gap-1.5">
+              <Rows3 size={15} className="text-primary" />
+              Configurar Estante
+            </span>
+            <span className="font-sans text-[11px] sm:text-[12px] text-on-surface-variant">Personaliza las dimensiones del estante seleccionado en tiempo real</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+            <div className="flex items-center gap-2">
+              <span className="font-sans text-[12.5px] font-medium text-on-surface-variant">Ancho:</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => onUpdateElement(selectedElement.id, { width: Math.max(20, (selectedElement.width ?? 96) - 8) })}
+                  className="w-7 h-7 rounded-full border border-outline-variant/30 bg-white hover:bg-surface-variant/30 flex items-center justify-center font-bold text-on-surface text-[14px] cursor-pointer shadow-sm active:scale-95 transition-transform"
+                  title="Reducir ancho"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  value={selectedElement.width ?? 96}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) {
+                      onUpdateElement(selectedElement.id, { width: Math.max(10, val) });
+                    }
+                  }}
+                  className="w-14 bg-white border border-outline-variant/30 rounded-lg py-0.5 text-center font-mono text-[12.5px] focus:outline-none focus:ring-1 focus:ring-primary shadow-inner"
+                />
+                <button
+                  type="button"
+                  onClick={() => onUpdateElement(selectedElement.id, { width: Math.min(500, (selectedElement.width ?? 96) + 8) })}
+                  className="w-7 h-7 rounded-full border border-outline-variant/30 bg-white hover:bg-surface-variant/30 flex items-center justify-center font-bold text-on-surface text-[14px] cursor-pointer shadow-sm active:scale-95 transition-transform"
+                  title="Aumentar ancho"
+                >
+                  +
+                </button>
+                <span className="font-mono text-[11px] text-on-surface-variant ml-0.5">px</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="font-sans text-[12.5px] font-medium text-on-surface-variant">Alto:</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => onUpdateElement(selectedElement.id, { height: Math.max(10, (selectedElement.height ?? 36) - 4) })}
+                  className="w-7 h-7 rounded-full border border-outline-variant/30 bg-white hover:bg-surface-variant/30 flex items-center justify-center font-bold text-on-surface text-[14px] cursor-pointer shadow-sm active:scale-95 transition-transform"
+                  title="Reducir alto"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  value={selectedElement.height ?? 36}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) {
+                      onUpdateElement(selectedElement.id, { height: Math.max(5, val) });
+                    }
+                  }}
+                  className="w-14 bg-white border border-outline-variant/30 rounded-lg py-0.5 text-center font-mono text-[12.5px] focus:outline-none focus:ring-1 focus:ring-primary shadow-inner"
+                />
+                <button
+                  type="button"
+                  onClick={() => onUpdateElement(selectedElement.id, { height: Math.min(300, (selectedElement.height ?? 36) + 4) })}
+                  className="w-7 h-7 rounded-full border border-outline-variant/30 bg-white hover:bg-surface-variant/30 flex items-center justify-center font-bold text-on-surface text-[14px] cursor-pointer shadow-sm active:scale-95 transition-transform"
+                  title="Aumentar alto"
+                >
+                  +
+                </button>
+                <span className="font-mono text-[11px] text-on-surface-variant ml-0.5">px</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setCopiedConfig({
+                    width: selectedElement.width,
+                    height: selectedElement.height,
+                    rotation: selectedElement.rotation
+                  });
+                  toast.success('Configuración del estante copiada.');
+                }}
+                className="flex items-center gap-1 px-3 py-1 border border-outline-variant/30 rounded-full bg-white hover:bg-surface-variant/30 font-sans text-[12px] font-semibold text-on-surface transition-all cursor-pointer shadow-sm active:scale-95"
+                title="Copiar configuración de este estante"
+              >
+                <Copy size={12} className="text-on-surface-variant" />
+                Copiar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onAddElement({
+                    width: selectedElement.width,
+                    height: selectedElement.height,
+                    rotation: selectedElement.rotation,
+                    x: Math.min(95, selectedElement.x + 4),
+                    y: Math.min(95, selectedElement.y + 4)
+                  });
+                  toast.success('Estante duplicado.');
+                }}
+                className="flex items-center gap-1 px-3 py-1 border border-outline-variant/30 rounded-full bg-white hover:bg-surface-variant/30 font-sans text-[12px] font-semibold text-on-surface transition-all cursor-pointer shadow-sm active:scale-95"
+                title="Duplicar este estante con la misma configuración"
+              >
+                <Plus size={12} className="text-on-surface-variant" />
+                Duplicar
+              </button>
+              <button
+                type="button"
+                onClick={() => onUpdateElement(selectedElement.id, { rotation: (selectedElement.rotation + 90) % 180 })}
+                className="flex items-center gap-1 px-3 py-1 border border-outline-variant/30 rounded-full bg-white hover:bg-surface-variant/30 font-sans text-[12px] font-semibold text-on-surface transition-all cursor-pointer shadow-sm active:scale-95"
+                title="Rotar estante 90 grados"
+              >
+                <RotateCw size={12} className="text-on-surface-variant" />
+                Rotar
+              </button>
+              <button
+                type="button"
+                onClick={() => { onDeleteElement(selectedElement.id); setSelectedElementId(null); }}
+                className="flex items-center gap-1 px-3 py-1 border border-error/20 rounded-full bg-white hover:bg-error/5 font-sans text-[12px] font-semibold text-error transition-all cursor-pointer shadow-sm active:scale-95"
+                title="Eliminar estante"
+              >
+                <X size={12} />
+                Eliminar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
