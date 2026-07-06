@@ -1,9 +1,22 @@
 import { useState, useEffect, useRef, Fragment, FormEvent } from 'react';
-import { Plus, X, Trash2, MapPin, Building2, History } from 'lucide-react';
-import { Aisle, Cabezal, CabezalPago, PaymentType } from '../types';
+import { Plus, X, Trash2, MapPin, Building2, History, Rows3, RotateCw } from 'lucide-react';
+import { Aisle, Cabezal, CabezalPago, PaymentType, DiagramElement } from '../types';
 import { db, isFirebaseConfigured } from '../firebase';
 import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { useToast } from './Toast';
+
+function loadLocalElements(): DiagramElement[] {
+  try {
+    const raw = localStorage.getItem('saman_cabezales_diagram_elements');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalElements(elements: DiagramElement[]) {
+  localStorage.setItem('saman_cabezales_diagram_elements', JSON.stringify(elements));
+}
 
 interface CabezalesViewProps {
   cabezales: Cabezal[];
@@ -21,6 +34,31 @@ function isExpired(periodEnd?: string): boolean {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return end.getTime() < today.getTime();
+}
+
+/**
+ * Monthly billing cycle for cabezal payments resets on day 5 of each month: from day 5
+ * through day 4 of the next month counts as the same billing period. Deriving the label from
+ * today's date (instead of storing a boolean) means a cabezal automatically flips back to
+ * "en deuda" once the 5th passes, without needing a scheduled job.
+ */
+function getBillingPeriodLabel(date: Date = new Date()): string {
+  const d = new Date(date);
+  if (d.getDate() < 5) {
+    d.setMonth(d.getMonth() - 1);
+  }
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatBillingPeriodLabel(period: string): string {
+  const [year, month] = period.split('-').map(Number);
+  if (!year || !month) return period;
+  const date = new Date(year, month - 1, 1);
+  return date.toLocaleDateString('es-VE', { month: 'long', year: 'numeric' });
+}
+
+function isPaidForCurrentPeriod(cabezal: Cabezal): boolean {
+  return cabezal.lastPaidPeriod === getBillingPeriodLabel();
 }
 
 function loadLocalPagos(cabezalId: string): CabezalPago[] {
@@ -46,6 +84,54 @@ export function CabezalesView({ cabezales, aisles, onAddCabezal, onUpdateCabezal
 
   const [selectedCabezal, setSelectedCabezal] = useState<Cabezal | null>(null);
   const [cabezalToDelete, setCabezalToDelete] = useState<Cabezal | null>(null);
+
+  const [elements, setElements] = useState<DiagramElement[]>([]);
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    if (isFirebaseConfigured) {
+      unsubscribe = onSnapshot(
+        doc(db, 'config', 'cabezalesDiagram'),
+        (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            setElements(Array.isArray(data.elements) ? data.elements : []);
+          }
+        },
+        (err) => console.error('Error al escuchar el diagrama:', err)
+      );
+    } else {
+      setElements(loadLocalElements());
+    }
+    return () => { if (unsubscribe) unsubscribe(); };
+  }, []);
+
+  const persistElements = async (next: DiagramElement[]) => {
+    setElements(next);
+    if (isFirebaseConfigured) {
+      try {
+        await setDoc(doc(db, 'config', 'cabezalesDiagram'), { elements: next }, { merge: true });
+      } catch (err) {
+        console.error('Error al guardar el diagrama:', err);
+        toast.error('Error al guardar el diagrama.');
+      }
+    } else {
+      saveLocalElements(next);
+    }
+  };
+
+  const handleAddElement = () => {
+    const newElement: DiagramElement = { id: 'el_' + Date.now(), x: 50, y: 50, rotation: 0 };
+    persistElements([...elements, newElement]);
+  };
+
+  const handleUpdateElement = (id: string, updates: Partial<DiagramElement>) => {
+    persistElements(elements.map(el => el.id === id ? { ...el, ...updates } : el));
+  };
+
+  const handleDeleteElement = (id: string) => {
+    persistElements(elements.filter(el => el.id !== id));
+  };
 
   const handleCreate = (e: FormEvent) => {
     e.preventDefault();
@@ -117,7 +203,15 @@ export function CabezalesView({ cabezales, aisles, onAddCabezal, onUpdateCabezal
             </div>
           )
         ) : (
-          <DiagramCanvas cabezales={cabezales} onUpdateCabezal={onUpdateCabezal} onOpenDetail={setSelectedCabezal} />
+          <DiagramCanvas
+            cabezales={cabezales}
+            onUpdateCabezal={onUpdateCabezal}
+            onOpenDetail={setSelectedCabezal}
+            elements={elements}
+            onAddElement={handleAddElement}
+            onUpdateElement={handleUpdateElement}
+            onDeleteElement={handleDeleteElement}
+          />
         )}
       </div>
 
@@ -185,6 +279,7 @@ function CabezalCard({ cabezal, aisles, onClick, onDelete }: {
 }) {
   const isRented = !!cabezal.tenantCompany;
   const expired = isExpired(cabezal.periodEnd);
+  const paidThisPeriod = isPaidForCurrentPeriod(cabezal);
   const linkedAisle = aisles.find(a => a.id === cabezal.linkedAisleId);
 
   return (
@@ -221,8 +316,8 @@ function CabezalCard({ cabezal, aisles, onClick, onDelete }: {
             <span className={`px-2.5 py-1 rounded-full font-mono text-[10.5px] font-bold uppercase ${expired ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20'}`}>
               {expired ? 'Vencido' : 'Vigente'}
             </span>
-            <span className={`px-2.5 py-1 rounded-full font-mono text-[10.5px] font-bold uppercase ${cabezal.isPaid ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}>
-              {cabezal.isPaid ? 'Pagado' : 'Pendiente'}
+            <span className={`px-2.5 py-1 rounded-full font-mono text-[10.5px] font-bold uppercase ${paidThisPeriod ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}>
+              {paidThisPeriod ? 'Pagado' : 'En Deuda'}
             </span>
           </>
         )}
@@ -301,7 +396,6 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
   const [paymentNotes, setPaymentNotes] = useState(cabezal.paymentNotes || '');
   const [periodStart, setPeriodStart] = useState(cabezal.periodStart || '');
   const [periodEnd, setPeriodEnd] = useState(cabezal.periodEnd || '');
-  const [isPaid, setIsPaid] = useState(!!cabezal.isPaid);
   const [pagos, setPagos] = useState<CabezalPago[]>([]);
   const [loadingPagos, setLoadingPagos] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -328,6 +422,8 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
   }, [cabezal.id]);
 
   const expired = isExpired(periodEnd);
+  const paidThisPeriod = isPaidForCurrentPeriod(cabezal);
+  const currentPeriodLabel = getBillingPeriodLabel();
   const linkedAisle = aisles.find(a => a.id === cabezal.linkedAisleId);
 
   const persistPago = async (pago: CabezalPago) => {
@@ -356,16 +452,32 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
       periodEnd,
       paymentType,
       paymentValue: paymentValue ? parseFloat(paymentValue) : 0,
-      isPaid,
+      isPaid: paidThisPeriod,
       notes: paymentNotes,
       createdAt: new Date().toISOString(),
-      ...(isPaid ? { paidDate: new Date().toISOString() } : {}),
+      ...(paidThisPeriod ? { paidDate: new Date().toISOString() } : {}),
     };
     persistPago(archivedPago);
     setPeriodStart('');
     setPeriodEnd('');
-    setIsPaid(false);
     toast.success('Período anterior archivado. Define las fechas del nuevo período y guarda los cambios.');
+  };
+
+  const handleRegisterPago = () => {
+    const paymentRecord: CabezalPago = {
+      id: 'pago_' + Date.now(),
+      periodStart: currentPeriodLabel + '-05',
+      periodEnd: currentPeriodLabel + '-05',
+      paymentType,
+      paymentValue: paymentValue ? parseFloat(paymentValue) : 0,
+      isPaid: true,
+      paidDate: new Date().toISOString(),
+      notes: `Pago del mes de ${formatBillingPeriodLabel(currentPeriodLabel)}${paymentNotes ? ' — ' + paymentNotes : ''}`,
+      createdAt: new Date().toISOString(),
+    };
+    persistPago(paymentRecord);
+    onUpdate({ lastPaidPeriod: currentPeriodLabel, lastUpdated: new Date().toISOString() });
+    toast.success(`Pago de ${formatBillingPeriodLabel(currentPeriodLabel)} registrado con éxito.`);
   };
 
   const handleSave = (e: FormEvent) => {
@@ -377,7 +489,6 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
       paymentNotes: paymentNotes.trim(),
       periodStart,
       periodEnd,
-      isPaid,
       lastUpdated: new Date().toISOString(),
     });
     toast.success('Cabezal actualizado con éxito.');
@@ -407,12 +518,33 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
                 <span className={`px-2.5 py-1 rounded-full font-mono text-[11px] font-bold uppercase ${expired ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20'}`}>
                   {expired ? 'Vencido' : 'Vigente'}
                 </span>
-                <span className={`px-2.5 py-1 rounded-full font-mono text-[11px] font-bold uppercase ${isPaid ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}>
-                  {isPaid ? 'Pagado' : 'Pendiente'}
+                <span className={`px-2.5 py-1 rounded-full font-mono text-[11px] font-bold uppercase ${paidThisPeriod ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}>
+                  {paidThisPeriod ? 'Pagado' : 'En Deuda'}
                 </span>
               </>
             )}
           </div>
+
+          {tenantCompany && (
+            <div className="flex items-center justify-between gap-3 bg-white/60 border border-outline-variant/20 rounded-2xl p-3.5">
+              <div className="min-w-0">
+                <span className="font-sans text-[13.5px] font-semibold text-on-surface block">
+                  Pago de {formatBillingPeriodLabel(currentPeriodLabel)}
+                </span>
+                <span className="font-mono text-[11px] text-on-surface-variant">
+                  {paidThisPeriod ? 'Ya se registró el pago de este mes.' : 'El ciclo mensual reinicia cada día 5.'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleRegisterPago}
+                disabled={paidThisPeriod}
+                className="flex-shrink-0 px-4 py-2.5 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[13px] font-semibold transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {paidThisPeriod ? 'Pagado' : 'Registrar Pago'}
+              </button>
+            </div>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Empresa que alquila</label>
@@ -486,16 +618,6 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
               />
             </div>
           </div>
-
-          <label className="flex items-center gap-3 p-3 rounded-2xl bg-white/60 border border-outline-variant/20 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isPaid}
-              onChange={(e) => setIsPaid(e.target.checked)}
-              className="w-4.5 h-4.5 rounded text-primary focus:ring-primary/20 border-outline-variant/50 cursor-pointer"
-            />
-            <span className="font-sans text-[14px] font-semibold text-on-surface">Período actual pagado</span>
-          </label>
 
           <button
             type="button"
@@ -578,25 +700,34 @@ function ConfirmDeleteModal({ cabezal, onCancel, onConfirm }: { cabezal: Cabezal
   );
 }
 
-function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail }: {
+function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onAddElement, onUpdateElement, onDeleteElement }: {
   cabezales: Cabezal[];
   onUpdateCabezal: (id: string, updates: Partial<Cabezal>) => void;
   onOpenDetail: (cabezal: Cabezal) => void;
+  elements: DiagramElement[];
+  onAddElement: () => void;
+  onUpdateElement: (id: string, updates: Partial<DiagramElement>) => void;
+  onDeleteElement: (id: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dragId, setDragId] = useState<string | null>(null);
+  const [drag, setDrag] = useState<{ type: 'cabezal' | 'element'; id: string } | null>(null);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const movedRef = useRef(false);
 
-  const handlePointerDown = (e: any, cab: Cabezal) => {
-    e.target.setPointerCapture?.(e.pointerId);
-    setDragId(cab.id);
+  const handlePointerDown = (e: any, type: 'cabezal' | 'element', id: string, x: number, y: number) => {
+    try {
+      e.target.setPointerCapture?.(e.pointerId);
+    } catch {
+      // ignore: pointer capture isn't essential, just a smoothing optimization for the drag
+    }
+    setDrag({ type, id });
     movedRef.current = false;
-    setDragPos({ x: cab.positionX ?? 50, y: cab.positionY ?? 50 });
+    setDragPos({ x, y });
   };
 
   const handlePointerMove = (e: any) => {
-    if (!dragId || !containerRef.current) return;
+    if (!drag || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
     const y = Math.min(100, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100));
@@ -604,55 +735,118 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail }: {
     setDragPos({ x, y });
   };
 
-  const handlePointerUp = (cab: Cabezal) => {
-    if (dragId === cab.id && dragPos) {
+  const handlePointerUp = () => {
+    if (drag && dragPos) {
       if (movedRef.current) {
-        onUpdateCabezal(cab.id, { positionX: dragPos.x, positionY: dragPos.y });
+        if (drag.type === 'cabezal') {
+          onUpdateCabezal(drag.id, { positionX: dragPos.x, positionY: dragPos.y });
+        } else {
+          onUpdateElement(drag.id, { x: dragPos.x, y: dragPos.y });
+        }
+      } else if (drag.type === 'cabezal') {
+        const cab = cabezales.find(c => c.id === drag.id);
+        if (cab) onOpenDetail(cab);
       } else {
-        onOpenDetail(cab);
+        setSelectedElementId(prev => (prev === drag.id ? null : drag.id));
       }
     }
-    setDragId(null);
+    setDrag(null);
     setDragPos(null);
   };
 
-  if (cabezales.length === 0) {
-    return (
-      <div className="bg-card-surface rounded-[32px] p-12 text-center border border-outline-variant/30 max-w-xl mx-auto shadow-sm mt-4">
-        <p className="font-sans text-[15px] text-on-surface-variant">Crea un cabezal primero para poder ubicarlo en el diagrama.</p>
-      </div>
-    );
-  }
+  const handleBackgroundPointerDown = (e: any) => {
+    if (e.target === containerRef.current) {
+      setSelectedElementId(null);
+    }
+  };
+
+  const isEmpty = cabezales.length === 0 && elements.length === 0;
 
   return (
     <div className="bg-card-surface rounded-3xl p-4 shadow-[0_4px_20px_rgba(40,28,25,0.05)]">
-      <p className="font-mono text-[12px] text-on-surface-variant mb-3 uppercase tracking-wider">Arrastra cada cabezal para ubicarlo en el plano de la tienda</p>
-      <div
-        ref={containerRef}
-        onPointerMove={handlePointerMove}
-        className="relative w-full aspect-[16/10] bg-surface-variant/20 rounded-2xl border-2 border-dashed border-outline-variant/40 touch-none select-none overflow-hidden"
-      >
-        {cabezales.map(cab => {
-          const isDragging = dragId === cab.id;
-          const x = isDragging && dragPos ? dragPos.x : (cab.positionX ?? 50);
-          const y = isDragging && dragPos ? dragPos.y : (cab.positionY ?? 50);
-          const isRented = !!cab.tenantCompany;
-          return (
-            <button
-              key={cab.id}
-              onPointerDown={(e) => handlePointerDown(e, cab)}
-              onPointerUp={() => handlePointerUp(cab)}
-              style={{ left: `${x}%`, top: `${y}%` }}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center w-20 h-14 sm:w-24 sm:h-16 rounded-xl border-2 shadow-md cursor-grab active:cursor-grabbing font-sans text-[11px] font-bold px-1 text-center transition-colors ${
-                isRented ? 'bg-primary/10 border-primary text-primary' : 'bg-white border-outline-variant/50 text-on-surface-variant'
-              }`}
-            >
-              <span className="truncate w-full">{cab.label}</span>
-              <span className="font-mono text-[9px] font-normal opacity-70 truncate w-full">{isRented ? cab.tenantCompany : 'Vacante'}</span>
-            </button>
-          );
-        })}
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
+        <p className="font-mono text-[11px] sm:text-[12px] text-on-surface-variant uppercase tracking-wider">Arrastra cabezales y estantes para armar el plano de la tienda</p>
+        <button
+          onClick={onAddElement}
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-surface-variant/50 hover:bg-surface-variant text-on-surface rounded-full font-sans text-[12.5px] font-semibold transition-all cursor-pointer flex-shrink-0"
+        >
+          <Rows3 size={14} />
+          Agregar Estante
+        </button>
       </div>
+
+      {isEmpty ? (
+        <div className="text-center py-12">
+          <p className="font-sans text-[15px] text-on-surface-variant">Crea un cabezal o agrega un estante para empezar a armar el plano.</p>
+        </div>
+      ) : (
+        <div
+          ref={containerRef}
+          onPointerMove={handlePointerMove}
+          onPointerDown={handleBackgroundPointerDown}
+          className="relative w-full aspect-[16/10] bg-surface-variant/20 rounded-2xl border-2 border-dashed border-outline-variant/40 touch-none select-none overflow-hidden"
+        >
+          {elements.map(el => {
+            const isDragging = drag?.type === 'element' && drag.id === el.id;
+            const x = isDragging && dragPos ? dragPos.x : el.x;
+            const y = isDragging && dragPos ? dragPos.y : el.y;
+            const isSelected = selectedElementId === el.id;
+            return (
+              <div
+                key={el.id}
+                onPointerDown={(e) => handlePointerDown(e, 'element', el.id, el.x, el.y)}
+                onPointerUp={handlePointerUp}
+                style={{ left: `${x}%`, top: `${y}%`, transform: `translate(-50%, -50%) rotate(${el.rotation}deg)` }}
+                className={`absolute w-20 h-8 sm:w-24 sm:h-9 bg-primary/10 border-2 rounded-md shadow-sm cursor-grab active:cursor-grabbing flex items-center justify-center ${isSelected ? 'border-primary' : 'border-primary/40'}`}
+              >
+                {isSelected && (
+                  <>
+                    <button
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); onUpdateElement(el.id, { rotation: (el.rotation + 90) % 180 }); }}
+                      style={{ transform: `rotate(${-el.rotation}deg)` }}
+                      className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-white border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:text-primary shadow-sm cursor-pointer"
+                      title="Rotar estante"
+                    >
+                      <RotateCw size={11} />
+                    </button>
+                    <button
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); onDeleteElement(el.id); setSelectedElementId(null); }}
+                      style={{ transform: `rotate(${-el.rotation}deg)` }}
+                      className="absolute -top-2.5 -left-2.5 w-5 h-5 rounded-full bg-white border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:text-error shadow-sm cursor-pointer"
+                      title="Eliminar estante"
+                    >
+                      <X size={11} />
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })}
+
+          {cabezales.map(cab => {
+            const isDragging = drag?.type === 'cabezal' && drag.id === cab.id;
+            const x = isDragging && dragPos ? dragPos.x : (cab.positionX ?? 50);
+            const y = isDragging && dragPos ? dragPos.y : (cab.positionY ?? 50);
+            const isRented = !!cab.tenantCompany;
+            return (
+              <button
+                key={cab.id}
+                onPointerDown={(e) => handlePointerDown(e, 'cabezal', cab.id, cab.positionX ?? 50, cab.positionY ?? 50)}
+                onPointerUp={handlePointerUp}
+                style={{ left: `${x}%`, top: `${y}%` }}
+                className={`absolute -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center justify-center w-20 h-14 sm:w-24 sm:h-16 rounded-xl border-2 shadow-md cursor-grab active:cursor-grabbing font-sans text-[11px] font-bold px-1 text-center transition-colors ${
+                  isRented ? 'bg-primary/10 border-primary text-primary' : 'bg-white border-outline-variant/50 text-on-surface-variant'
+                }`}
+              >
+                <span className="truncate w-full">{cab.label}</span>
+                <span className="font-mono text-[9px] font-normal opacity-70 truncate w-full">{isRented ? cab.tenantCompany : 'Vacante'}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

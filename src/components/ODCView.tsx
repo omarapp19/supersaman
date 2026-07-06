@@ -1,7 +1,7 @@
 import { useState, useMemo, Fragment, FormEvent } from 'react';
-import { Plus, X, Trash2, Pencil, Check, FileSpreadsheet, AlertTriangle } from 'lucide-react';
+import { Plus, X, Trash2, Pencil, Check, FileSpreadsheet, AlertTriangle, Printer } from 'lucide-react';
 import { PurchaseOrder } from '../types';
-import { getDayKey, getWeekKey, formatWeekLabel } from '../utils/dateGrouping';
+import { getDayKey, getWeekKey, formatWeekLabel, parseLocalDate } from '../utils/dateGrouping';
 import { useToast } from './Toast';
 
 interface ODCViewProps {
@@ -19,7 +19,7 @@ function formatMoney(n: number): string {
 }
 
 function formatShortDate(iso: string): string {
-  const date = new Date(iso);
+  const date = parseLocalDate(iso);
   if (isNaN(date.getTime())) return iso;
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -28,7 +28,7 @@ function formatShortDate(iso: string): string {
 }
 
 function formatDayLabel(iso: string): string {
-  const date = new Date(iso);
+  const date = parseLocalDate(iso);
   if (isNaN(date.getTime())) return 'Sin fecha';
   const today = new Date();
   const yesterday = new Date(today);
@@ -63,6 +63,9 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
   const [tempMonto, setTempMonto] = useState('');
   const [orderToDelete, setOrderToDelete] = useState<PurchaseOrder | null>(null);
 
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printWeekKey, setPrintWeekKey] = useState('');
+
   const currentWeekKey = getWeekKey(new Date().toISOString());
   const currentWeekTotal = useMemo(
     () => purchaseOrders.filter(o => getWeekKey(o.fecha) === currentWeekKey).reduce((sum, o) => sum + (o.monto || 0), 0),
@@ -81,6 +84,19 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
     });
     return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
   }, [purchaseOrders]);
+
+  // Includes the current week even if it has no orders yet, so it can be printed as an empty/in-progress report.
+  const printableWeekKeys = useMemo(() => {
+    const keys = new Set<string>(weekGroups.map(([wk]) => wk));
+    keys.add(currentWeekKey);
+    return Array.from(keys).sort((a, b) => b.localeCompare(a));
+  }, [weekGroups, currentWeekKey]);
+
+  const printOrders = useMemo(
+    () => purchaseOrders.filter(o => getWeekKey(o.fecha) === printWeekKey).sort((a, b) => a.fecha.localeCompare(b.fecha)),
+    [purchaseOrders, printWeekKey]
+  );
+  const printTotal = printOrders.reduce((sum, o) => sum + (o.monto || 0), 0);
 
   const handleAdd = (e: FormEvent) => {
     e.preventDefault();
@@ -144,21 +160,30 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
 
   return (
     <>
-      <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+      <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12 print-hide">
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h2 className="font-sans text-[26px] sm:text-[32px] md:text-[48px] font-bold text-on-surface leading-tight tracking-tight">ODC</h2>
             <p className="font-sans text-[14px] sm:text-[16px] md:text-[18px] text-on-surface-variant mt-1 sm:mt-2">Control de órdenes de compra y tope semanal.</p>
           </div>
-          {canEdit && (
+          <div className="flex gap-2 self-start sm:self-auto">
             <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[15px] font-semibold transition-all shadow-md self-start sm:self-auto cursor-pointer"
+              onClick={() => { setPrintWeekKey(currentWeekKey); setShowPrintModal(true); }}
+              className="flex items-center justify-center gap-2 px-5 py-3 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface rounded-full font-sans text-[15px] font-semibold transition-all shadow-sm cursor-pointer"
             >
-              <Plus size={18} />
-              Nueva Orden
+              <Printer size={18} />
+              Imprimir
             </button>
-          )}
+            {canEdit && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[15px] font-semibold transition-all shadow-md cursor-pointer"
+              >
+                <Plus size={18} />
+                Nueva Orden
+              </button>
+            )}
+          </div>
         </header>
 
         {/* Weekly summary */}
@@ -302,8 +327,98 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
         )}
       </div>
 
+      {/* Print-only report for the selected week */}
+      <div className="hidden print:block w-full text-black font-sans bg-white p-2">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold">Súper Samán — Órdenes de Compra (ODC)</h1>
+          <p className="text-sm mt-1 capitalize">{printWeekKey && formatWeekLabel(printWeekKey)}</p>
+        </div>
+        <div className="mb-5 text-sm flex flex-col gap-1">
+          <div><strong>Tope semanal:</strong> {formatMoney(weeklyLimit)}</div>
+          <div><strong>Total de la semana:</strong> {formatMoney(printTotal)}</div>
+          <div>
+            <strong>{printTotal > weeklyLimit ? 'Excedido por' : 'Restante'}:</strong> {formatMoney(Math.abs(weeklyLimit - printTotal))}
+          </div>
+        </div>
+        {printOrders.length === 0 ? (
+          <p className="text-sm">No hay órdenes registradas en esta semana.</p>
+        ) : (
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono text-left">Fecha</th>
+                <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono text-left">Empresa</th>
+                <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono text-left">N° Orden</th>
+                <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono text-right">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {printOrders.map(o => (
+                <tr key={o.id}>
+                  <td className="py-3 text-sm border-b border-gray-200">{formatShortDate(o.fecha)}</td>
+                  <td className="py-3 text-sm border-b border-gray-200">{o.empresa}</td>
+                  <td className="py-3 text-sm border-b border-gray-200">{o.numeroOrden}</td>
+                  <td className="py-3 text-sm border-b border-gray-200 text-right">{formatMoney(o.monto)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={3} className="py-3 text-sm font-bold text-right border-t-2 border-black">Total</td>
+                <td className="py-3 text-sm font-bold text-right border-t-2 border-black">{formatMoney(printTotal)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        )}
+      </div>
+
+      {showPrintModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print-hide" onClick={() => setShowPrintModal(false)}>
+          <div className="bg-card-surface rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center p-6 border-b border-outline-variant/20">
+              <h3 className="font-sans text-[20px] font-bold text-on-surface flex items-center gap-2">
+                <Printer className="text-primary" size={20} />
+                Imprimir Reporte
+              </h3>
+              <button onClick={() => setShowPrintModal(false)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-variant transition-colors cursor-pointer">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Semana a imprimir</label>
+                <select
+                  value={printWeekKey}
+                  onChange={(e) => setPrintWeekKey(e.target.value)}
+                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3.5 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm capitalize"
+                >
+                  {printableWeekKeys.map(wk => (
+                    <option key={wk} value={wk}>
+                      {formatWeekLabel(wk)}{wk === currentWeekKey ? ' (actual)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-3 mt-2">
+                <button type="button" onClick={() => setShowPrintModal(false)} className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer">
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { window.print(); setShowPrintModal(false); }}
+                  className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Printer size={16} />
+                  Imprimir
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowAddModal(false)}>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print-hide" onClick={() => setShowAddModal(false)}>
           <div className="bg-card-surface rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center p-6 border-b border-outline-variant/20">
               <h3 className="font-sans text-[20px] font-bold text-on-surface">Nueva Orden de Compra</h3>
@@ -342,7 +457,7 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
       )}
 
       {orderToDelete && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setOrderToDelete(null)}>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print-hide" onClick={() => setOrderToDelete(null)}>
           <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 flex flex-col items-center text-center gap-4">
               <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">

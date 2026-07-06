@@ -52,7 +52,8 @@ export interface Cabezal {
   paymentNotes?: string;
   periodStart?: string;
   periodEnd?: string;
-  isPaid?: boolean;
+  /** Billing period label (e.g. "2026-07") of the last month paid. Monthly cycle resets on day 5. */
+  lastPaidPeriod?: string;
   lastUpdated: string;
 }
 
@@ -66,6 +67,13 @@ export interface CabezalPago {
   paidDate?: string;
   notes?: string;
   createdAt: string;
+}
+
+export interface DiagramElement {
+  id: string;
+  x: number;
+  y: number;
+  rotation: number;
 }
 
 export interface PurchaseOrder {
