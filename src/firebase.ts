@@ -25,6 +25,32 @@ export const db = initializeFirestore(app, {
   })
 });
 
+const FRIENDLY_ERROR_MESSAGES: Record<string, string> = {
+  'auth/invalid-credential': 'Usuario o contraseña incorrectos.',
+  'auth/user-not-found': 'Usuario o contraseña incorrectos.',
+  'auth/wrong-password': 'Usuario o contraseña incorrectos.',
+  'auth/invalid-email': 'El usuario ingresado no tiene un formato válido.',
+  'auth/too-many-requests': 'Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.',
+  'auth/network-request-failed': 'Error de conexión. Verifica tu red e intenta de nuevo.',
+  'auth/email-already-in-use': 'Ya existe un usuario con ese nombre de usuario.',
+  'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres.',
+  'auth/configuration-not-found': 'El proveedor de Correo/Contraseña está inactivo en tu Firebase Console. Habilítalo en Authentication > Sign-in method.',
+  'permission-denied': 'No tienes permisos suficientes para realizar esta acción.',
+  'unavailable': 'No se pudo conectar con el servidor. Verifica tu conexión a internet.',
+};
+
+/**
+ * Traduce códigos de error de Firebase a mensajes en español para el usuario final,
+ * en vez de exponer el texto técnico crudo del SDK (ej. "Firebase: Error (auth/invalid-credential).").
+ */
+export function getFriendlyErrorMessage(error: unknown, fallback: string): string {
+  const code = (error as { code?: string } | null)?.code;
+  if (code && FRIENDLY_ERROR_MESSAGES[code]) {
+    return FRIENDLY_ERROR_MESSAGES[code];
+  }
+  return fallback;
+}
+
 export async function bootstrapFirestore(force: boolean = false) {
   if (!isFirebaseConfigured) return;
 

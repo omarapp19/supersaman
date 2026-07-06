@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ViewState, Aisle } from './types';
+import { ViewState, Aisle, Cabezal, PurchaseOrder } from './types';
 import { Sidebar } from './components/Sidebar';
 import { BottomNav } from './components/BottomNav';
 import { PanelView } from './components/PanelView';
@@ -9,6 +9,8 @@ import { ComprasView } from './components/ComprasView';
 import { ConfiguracionView } from './components/ConfiguracionView';
 import { Login } from './components/Login';
 import { SugeridosView } from './components/SugeridosView';
+import { CabezalesView } from './components/CabezalesView';
+import { ODCView } from './components/ODCView';
 import { auth, isFirebaseConfigured, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs, updateDoc } from 'firebase/firestore';
@@ -52,6 +54,28 @@ function AppContent() {
       { id: 'u2', username: 'juan', fullName: 'Juan Pérez', role: 'operador', assignedAisles: [1] },
       { id: 'u3', username: 'maria', fullName: 'María García', role: 'supervisor', assignedAisles: [4] }
     ];
+  });
+  const [cabezales, setCabezales] = useState<Cabezal[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(() => {
+    if (!isFirebaseConfigured) {
+      const stored = localStorage.getItem('saman_purchase_orders');
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch (e) {
+          return [];
+        }
+      }
+    }
+    return [];
+  });
+  const [odcWeeklyLimit, setOdcWeeklyLimit] = useState<number>(() => {
+    if (!isFirebaseConfigured) {
+      const stored = localStorage.getItem('saman_odc_limit');
+      const n = stored ? parseFloat(stored) : NaN;
+      if (!isNaN(n)) return n;
+    }
+    return 35000;
   });
   const toast = useToast();
 
@@ -281,10 +305,48 @@ function AppContent() {
         console.error("Error al escuchar usuarios de Firestore:", error);
       });
 
+      // Subscribe to cabezales
+      const unsubscribeCabezales = onSnapshot(collection(db, 'cabezales'), (snapshot) => {
+        const cabezalesData: any[] = [];
+        snapshot.forEach((doc) => {
+          cabezalesData.push({ id: doc.id, ...doc.data() });
+        });
+        setCabezales(cabezalesData);
+      }, (error) => {
+        console.error("Error al escuchar cabezales de Firestore:", error);
+      });
+
+      // Subscribe to purchase orders (ODC)
+      const unsubscribePurchaseOrders = onSnapshot(collection(db, 'purchaseOrders'), (snapshot) => {
+        const purchaseOrdersData: any[] = [];
+        snapshot.forEach((doc) => {
+          purchaseOrdersData.push({ id: doc.id, ...doc.data() });
+        });
+        purchaseOrdersData.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+        setPurchaseOrders(purchaseOrdersData);
+      }, (error) => {
+        console.error("Error al escuchar órdenes de compra de Firestore:", error);
+      });
+
+      // Subscribe to ODC weekly limit config
+      const unsubscribeOdcConfig = onSnapshot(doc(db, 'config', 'odc'), (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (typeof data.weeklyLimit === 'number') {
+            setOdcWeeklyLimit(data.weeklyLimit);
+          }
+        }
+      }, (error) => {
+        console.error("Error al escuchar configuración de ODC:", error);
+      });
+
       return () => {
         unsubscribeAisles();
         unsubscribeOrders();
         unsubscribeUsers();
+        unsubscribeCabezales();
+        unsubscribePurchaseOrders();
+        unsubscribeOdcConfig();
       };
     }
   }, [user]);
@@ -318,6 +380,9 @@ function AppContent() {
           return;
         }
       }
+    }
+    if ((view === 'cabezales' || view === 'odc') && user?.role !== 'admin') {
+      return;
     }
     const resolvedAisleNum = aisleNum !== undefined ? aisleNum : selectedAisleNumber;
     if (aisleNum !== undefined) {
@@ -408,6 +473,108 @@ function AppContent() {
     }
   };
 
+  const handleAddCabezal = async (newCabezal: Cabezal) => {
+    if (isFirebaseConfigured) {
+      try {
+        await setDoc(doc(db, 'cabezales', newCabezal.id), newCabezal);
+      } catch (error) {
+        console.error("Error al guardar cabezal en Firestore:", error);
+      }
+    } else {
+      setCabezales(prev => [...prev, newCabezal]);
+    }
+  };
+
+  const handleUpdateCabezal = async (cabezalId: string, updates: Partial<Cabezal>) => {
+    if (isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'cabezales', cabezalId), updates);
+      } catch (error) {
+        console.error("Error al actualizar cabezal en Firestore:", error);
+      }
+    } else {
+      setCabezales(prev => prev.map(c => c.id === cabezalId ? { ...c, ...updates } : c));
+    }
+  };
+
+  const handleDeleteCabezal = async (cabezalId: string) => {
+    if (isFirebaseConfigured) {
+      try {
+        const pagosSnap = await getDocs(collection(db, 'cabezales', cabezalId, 'pagos'));
+        for (const pagoDoc of pagosSnap.docs) {
+          await deleteDoc(pagoDoc.ref);
+        }
+        await deleteDoc(doc(db, 'cabezales', cabezalId));
+      } catch (error) {
+        console.error('Error al eliminar cabezal:', error);
+      }
+    } else {
+      setCabezales(prev => prev.filter(c => c.id !== cabezalId));
+      localStorage.removeItem(`saman_cabezal_pagos_${cabezalId}`);
+    }
+  };
+
+  const handleAddPurchaseOrder = async (order: PurchaseOrder) => {
+    if (isFirebaseConfigured) {
+      try {
+        await setDoc(doc(db, 'purchaseOrders', order.id), order);
+      } catch (error) {
+        console.error("Error al guardar orden de compra en Firestore:", error);
+      }
+    } else {
+      setPurchaseOrders(prev => {
+        const updated = [order, ...prev];
+        localStorage.setItem('saman_purchase_orders', JSON.stringify(updated));
+        return updated;
+      });
+    }
+  };
+
+  const handleUpdatePurchaseOrder = async (orderId: string, updates: Partial<PurchaseOrder>) => {
+    if (isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'purchaseOrders', orderId), updates);
+      } catch (error) {
+        console.error("Error al actualizar orden de compra en Firestore:", error);
+      }
+    } else {
+      setPurchaseOrders(prev => {
+        const updated = prev.map(o => o.id === orderId ? { ...o, ...updates } : o);
+        localStorage.setItem('saman_purchase_orders', JSON.stringify(updated));
+        return updated;
+      });
+    }
+  };
+
+  const handleDeletePurchaseOrder = async (orderId: string) => {
+    if (isFirebaseConfigured) {
+      try {
+        await deleteDoc(doc(db, 'purchaseOrders', orderId));
+      } catch (error) {
+        console.error('Error al eliminar orden de compra:', error);
+      }
+    } else {
+      setPurchaseOrders(prev => {
+        const updated = prev.filter(o => o.id !== orderId);
+        localStorage.setItem('saman_purchase_orders', JSON.stringify(updated));
+        return updated;
+      });
+    }
+  };
+
+  const handleUpdateOdcLimit = async (newLimit: number) => {
+    setOdcWeeklyLimit(newLimit);
+    if (isFirebaseConfigured) {
+      try {
+        await setDoc(doc(db, 'config', 'odc'), { weeklyLimit: newLimit }, { merge: true });
+      } catch (error) {
+        console.error("Error al actualizar tope semanal de ODC:", error);
+      }
+    } else {
+      localStorage.setItem('saman_odc_limit', String(newLimit));
+    }
+  };
+
   const handleDeleteProduct = async (aisleId: string, productId: string) => {
     if (isFirebaseConfigured) {
       try {
@@ -490,7 +657,28 @@ function AppContent() {
           <ComprasView orders={orders} onNavigate={navigateToView} aisles={aisles} checkedOrders={checkedOrders} toggleChecked={toggleChecked} onUpdateOrder={handleUpdateOrder} user={user} />
         )}
         {currentView === 'configuracion' && (
-          <ConfiguracionView aisles={aisles} users={users} setUsers={setUsers} />
+          <ConfiguracionView aisles={aisles} users={users} setUsers={setUsers} onNavigate={navigateToView} user={user} />
+        )}
+        {currentView === 'cabezales' && (
+          <CabezalesView
+            cabezales={cabezales}
+            aisles={aisles}
+            onAddCabezal={handleAddCabezal}
+            onUpdateCabezal={handleUpdateCabezal}
+            onDeleteCabezal={handleDeleteCabezal}
+            user={user}
+          />
+        )}
+        {currentView === 'odc' && (
+          <ODCView
+            purchaseOrders={purchaseOrders}
+            weeklyLimit={odcWeeklyLimit}
+            onAddPurchaseOrder={handleAddPurchaseOrder}
+            onUpdatePurchaseOrder={handleUpdatePurchaseOrder}
+            onDeletePurchaseOrder={handleDeletePurchaseOrder}
+            onUpdateOdcLimit={handleUpdateOdcLimit}
+            user={user}
+          />
         )}
       </main>
 

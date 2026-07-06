@@ -1,8 +1,8 @@
 import { useState, useEffect, FormEvent, Dispatch, SetStateAction } from 'react';
-import { Shield, Bell, Cpu, Sparkles, Check, RefreshCw, Database, Trash2, Users, UserPlus, Edit, X } from 'lucide-react';
-import { db, isFirebaseConfigured, bootstrapFirestore, clearAllFirestoreData, createFirebaseUser } from '../firebase';
+import { Shield, Bell, Cpu, Sparkles, Check, RefreshCw, Database, Trash2, Users, UserPlus, Edit, X, LayoutTemplate, FileSpreadsheet, ChevronRight } from 'lucide-react';
+import { db, isFirebaseConfigured, bootstrapFirestore, clearAllFirestoreData, createFirebaseUser, getFriendlyErrorMessage } from '../firebase';
 import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { Aisle } from '../types';
+import { Aisle, ViewState } from '../types';
 import { mockProductsByAisle } from '../data';
 import { useToast } from './Toast';
 
@@ -10,9 +10,11 @@ interface ConfiguracionViewProps {
   aisles: Aisle[];
   users: any[];
   setUsers: Dispatch<SetStateAction<any[]>>;
+  onNavigate?: (view: ViewState) => void;
+  user?: any;
 }
 
-export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionViewProps) {
+export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }: ConfiguracionViewProps) {
   const toast = useToast();
   const [pushAlerts, setPushAlerts] = useState(() => localStorage.getItem('saman_push_alerts') !== 'false');
   const [offlineSync, setOfflineSync] = useState(true);
@@ -81,7 +83,7 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
       toast.success('Base de datos vaciada con éxito.');
       setDbMessage('Base de datos vaciada con éxito.');
     } catch (error) {
-      toast.error('Error al vaciar la base de datos: ' + (error as Error).message);
+      toast.error(getFriendlyErrorMessage(error, 'Error al vaciar la base de datos. Intenta de nuevo.'));
       setDbMessage('Error al vaciar la base de datos.');
     } finally {
       setDbActionLoading(false);
@@ -96,7 +98,7 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
       toast.success('Datos de ejemplo cargados con éxito.');
       setDbMessage('Datos de ejemplo cargados con éxito.');
     } catch (error) {
-      toast.error('Error al cargar datos de ejemplo: ' + (error as Error).message);
+      toast.error(getFriendlyErrorMessage(error, 'Error al cargar datos de ejemplo. Intenta de nuevo.'));
       setDbMessage('Error al cargar datos de ejemplo.');
     } finally {
       setDbActionLoading(false);
@@ -142,7 +144,7 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
         toast.success(editingUserId ? 'Usuario actualizado con éxito.' : 'Usuario creado con éxito.');
       } catch (error) {
         console.error("Error al guardar usuario en Firestore:", error);
-        toast.error("Error al guardar usuario: " + (error as Error).message);
+        toast.error(getFriendlyErrorMessage(error, 'Error al guardar el usuario. Intenta de nuevo.'));
       }
     } else {
       if (editingUserId) {
@@ -175,6 +177,42 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
         <h2 className="font-sans text-[32px] md:text-[48px] font-bold text-on-surface leading-tight tracking-tight">Configuración</h2>
         <p className="font-sans text-[16px] md:text-[18px] text-on-surface-variant mt-2">Personaliza parámetros de reabastecimiento, gestiona usuarios y administra bases de datos.</p>
       </header>
+
+      {user?.role === 'admin' && onNavigate && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          <button
+            onClick={() => onNavigate('cabezales')}
+            className="flex items-center justify-between gap-3 bg-card-surface hover:bg-white rounded-3xl p-5 shadow-[0_4px_20px_rgba(40,28,25,0.05)] border border-transparent hover:border-primary/30 transition-all cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 text-primary p-2.5 rounded-2xl flex-shrink-0">
+                <LayoutTemplate size={22} />
+              </div>
+              <div>
+                <h3 className="font-sans text-[15px] font-bold text-on-surface">Gestión de Cabezales</h3>
+                <p className="font-sans text-[12.5px] text-on-surface-variant">Alquileres, pagos y diagrama de ubicación.</p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-on-surface-variant flex-shrink-0" />
+          </button>
+
+          <button
+            onClick={() => onNavigate('odc')}
+            className="flex items-center justify-between gap-3 bg-card-surface hover:bg-white rounded-3xl p-5 shadow-[0_4px_20px_rgba(40,28,25,0.05)] border border-transparent hover:border-primary/30 transition-all cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 text-primary p-2.5 rounded-2xl flex-shrink-0">
+                <FileSpreadsheet size={22} />
+              </div>
+              <div>
+                <h3 className="font-sans text-[15px] font-bold text-on-surface">Órdenes de Compra (ODC)</h3>
+                <p className="font-sans text-[12.5px] text-on-surface-variant">Control del tope semanal de pedidos.</p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-on-surface-variant flex-shrink-0" />
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column - main settings */}
@@ -634,7 +672,7 @@ export function ConfiguracionView({ aisles, users, setUsers }: ConfiguracionView
                         toast.success(`Usuario @${username} eliminado con éxito.`);
                       } catch (error) {
                         console.error("Error al eliminar usuario en Firestore:", error);
-                        toast.error("Error al eliminar: " + (error as Error).message);
+                        toast.error(getFriendlyErrorMessage(error, 'Error al eliminar el usuario. Intenta de nuevo.'));
                       }
                     } else {
                       setUsers(prev => prev.filter(u => u.id !== id));

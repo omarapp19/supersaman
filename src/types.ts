@@ -1,4 +1,4 @@
-export type ViewState = 'panel' | 'pasillos' | 'pasillo-detail' | 'sugeridos' | 'compras' | 'configuracion';
+export type ViewState = 'panel' | 'pasillos' | 'pasillo-detail' | 'sugeridos' | 'compras' | 'configuracion' | 'cabezales' | 'odc';
 
 export interface Aisle {
   id: string;
@@ -36,6 +36,46 @@ export interface OrderItem {
   checked?: boolean;
   company?: string;
   und_x_caja?: number;
+}
+
+export type PaymentType = 'descuento_factura' | 'porcentaje' | 'regalia';
+
+export interface Cabezal {
+  id: string;
+  label: string;
+  linkedAisleId?: string;
+  positionX?: number;
+  positionY?: number;
+  tenantCompany?: string;
+  paymentType?: PaymentType;
+  paymentValue?: number;
+  paymentNotes?: string;
+  periodStart?: string;
+  periodEnd?: string;
+  isPaid?: boolean;
+  lastUpdated: string;
+}
+
+export interface CabezalPago {
+  id: string;
+  periodStart: string;
+  periodEnd: string;
+  paymentType: PaymentType;
+  paymentValue?: number;
+  isPaid: boolean;
+  paidDate?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  fecha: string;
+  empresa: string;
+  numeroOrden: string;
+  monto: number;
+  user: string;
+  lastUpdated: string;
 }
 
 

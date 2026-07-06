@@ -21,5 +21,25 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if true;
     }
+
+    // Reglas para la colección de cabezales (alquiler de puntas de góndola)
+    match /cabezales/{cabezalId} {
+      allow read, write: if true;
+
+      // Historial de períodos de pago de cada cabezal
+      match /pagos/{pagoId} {
+        allow read, write: if true;
+      }
+    }
+
+    // Reglas para las órdenes de compra (ODC)
+    match /purchaseOrders/{orderId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para configuración general de la app (ej. tope semanal de ODC)
+    match /config/{configId} {
+      allow read, write: if true;
+    }
   }
 }

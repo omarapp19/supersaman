@@ -3,6 +3,7 @@ import { Search, Printer, ChevronDown, X, Store, CheckCircle2, Circle, CalendarD
 import { ViewState, OrderItem, Aisle } from '../types';
 import { isFirebaseConfigured } from '../firebase';
 import { mockProductsByAisle } from '../data';
+import { getDayKey, getStartOfWeekDate, getWeekKey, formatWeekLabel } from '../utils/dateGrouping';
 
 interface ComprasViewProps {
   orders: OrderItem[];
@@ -50,50 +51,11 @@ function formatDayLabel(isoOrLegacy: string): string {
   });
 }
 
-// Get YYYY-MM-DD key from ISO string for grouping
-function getDayKey(isoOrLegacy: string): string {
-  const date = new Date(isoOrLegacy);
-  if (isNaN(date.getTime())) return 'legacy';
-  return date.toISOString().slice(0, 10);
-}
-
 // Format time from ISO string
 function formatTime(isoOrLegacy: string): string {
   const date = new Date(isoOrLegacy);
   if (isNaN(date.getTime())) return '';
   return date.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
-}
-
-// Get the Monday of the week for a given ISO or legacy date string
-function getStartOfWeekDate(isoOrLegacy: string): Date {
-  const date = new Date(isoOrLegacy);
-  if (isNaN(date.getTime())) return new Date();
-  
-  const day = date.getDay(); // 0 is Sunday, 6 is Saturday
-  // Adjust to make Monday index 0:
-  // If Sunday (0), subtract 6 days. Otherwise, subtract (day - 1) days.
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(date.setDate(diff));
-  monday.setHours(0, 0, 0, 0);
-  return monday;
-}
-
-// Generate a human-readable week label
-function formatWeekLabel(isoOrLegacy: string): string {
-  const monday = getStartOfWeekDate(isoOrLegacy);
-  const label = monday.toLocaleDateString('es-VE', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-  return "Semana del " + label;
-}
-
-// Get week key (YYYY-MM-DD representing the Monday)
-function getWeekKey(isoOrLegacy: string): string {
-  const monday = getStartOfWeekDate(isoOrLegacy);
-  return monday.toISOString().slice(0, 10);
 }
 
 export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleChecked, onUpdateOrder, user }: ComprasViewProps) {

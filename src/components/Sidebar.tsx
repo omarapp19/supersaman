@@ -1,4 +1,4 @@
-import { LayoutDashboard, Store, ShoppingCart, Settings, LogOut, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Store, ShoppingCart, Settings, LogOut, Sparkles, LayoutTemplate, FileSpreadsheet } from 'lucide-react';
 import { ViewState } from '../types';
 
 interface SidebarProps {
@@ -39,6 +39,7 @@ export function Sidebar({ currentView, onNavigate, onLogout, user }: SidebarProp
     : 'Administrador';
 
   const isOperator = user?.role === 'operador';
+  const isAdmin = user?.role === 'admin';
 
   return (
     <nav className="h-full w-64 left-0 fixed hidden md:flex flex-col bg-card-surface shadow-sm z-50 border-r border-outline-variant/20 print-hide">
@@ -67,6 +68,12 @@ export function Sidebar({ currentView, onNavigate, onLogout, user }: SidebarProp
           <NavItem active={currentView === 'pasillos' || currentView === 'pasillo-detail'} icon={Store} label="Pasillos" onClick={() => onNavigate('pasillos')} />
           <NavItem active={currentView === 'sugeridos'} icon={Sparkles} label="Sugeridos" onClick={() => onNavigate('sugeridos')} />
           <NavItem active={currentView === 'compras'} icon={ShoppingCart} label={isOperator ? "Mis Pedidos" : "Compras"} onClick={() => onNavigate('compras')} />
+          {isAdmin && (
+            <NavItem active={currentView === 'cabezales'} icon={LayoutTemplate} label="Cabezales" onClick={() => onNavigate('cabezales')} />
+          )}
+          {isAdmin && (
+            <NavItem active={currentView === 'odc'} icon={FileSpreadsheet} label="ODC" onClick={() => onNavigate('odc')} />
+          )}
           {!isOperator && (
             <NavItem active={currentView === 'configuracion'} icon={Settings} label="Configuración" onClick={() => onNavigate('configuracion')} />
           )}

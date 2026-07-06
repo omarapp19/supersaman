@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { auth, isFirebaseConfigured } from '../firebase';
+import { auth, isFirebaseConfigured, getFriendlyErrorMessage } from '../firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { LogIn, Lock, User, ShieldAlert } from 'lucide-react';
 
@@ -132,9 +132,9 @@ export function Login({ onMockLogin }: LoginProps) {
           });
           return;
         }
-        setError('El proveedor de Correo/Contraseña está inactivo en tu Firebase Console. Habilítalo en Authentication > Sign-in method.');
+        setError(getFriendlyErrorMessage(err, 'El proveedor de Correo/Contraseña está inactivo en tu Firebase Console. Habilítalo en Authentication > Sign-in method.'));
       } else {
-        setError(err.message || 'Error al iniciar sesión. Verifica tus credenciales.');
+        setError(getFriendlyErrorMessage(err, 'Error al iniciar sesión. Verifica tus credenciales.'));
       }
     } finally {
       setLoading(false);
