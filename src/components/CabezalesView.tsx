@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, Fragment, FormEvent } from 'react';
-import { Plus, X, Trash2, MapPin, Building2, History, Rows3, RotateCw, Copy, Clipboard as ClipboardIcon, Minus, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Plus, X, Trash2, MapPin, Building2, History, Rows3, RotateCw, Copy, Clipboard as ClipboardIcon, Minus, ZoomIn, ZoomOut, Maximize2, Grid, Magnet, Layers } from 'lucide-react';
 import { Aisle, Cabezal, CabezalPago, PaymentType, DiagramElement } from '../types';
 import { db, isFirebaseConfigured } from '../firebase';
 import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
@@ -949,32 +949,34 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
 
   return (
     <div className="bg-card-surface rounded-3xl p-4 shadow-[0_4px_20px_rgba(40,28,25,0.05)]">
-      <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
-        <p className="font-mono text-[11px] sm:text-[12px] text-on-surface-variant uppercase tracking-wider">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4">
+        <p className="font-mono text-[11px] sm:text-[12px] text-on-surface-variant uppercase tracking-wider max-w-md">
           Arrastra cabezales y estantes para armar el plano de la tienda
         </p>
-        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-start md:justify-end">
           <button
             onClick={toggleSnapToGrid}
-            className={`px-3 py-1.5 rounded-full font-sans text-[12px] font-semibold transition-all border cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full font-sans text-[12px] font-semibold transition-all border cursor-pointer ${
               snapToGrid 
                 ? 'bg-primary/10 text-primary border-primary/30 hover:bg-primary/20' 
                 : 'bg-white text-on-surface-variant border-outline-variant/30 hover:bg-surface-variant/30'
             }`}
             title="Ajustar a cuadrícula de puntos"
           >
-            Cuadrícula
+            <Grid size={14} />
+            <span className="hidden sm:inline">Cuadrícula</span>
           </button>
           <button
             onClick={toggleSnapToElements}
-            className={`px-3 py-1.5 rounded-full font-sans text-[12px] font-semibold transition-all border cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full font-sans text-[12px] font-semibold transition-all border cursor-pointer ${
               snapToElements 
                 ? 'bg-primary/10 text-primary border-primary/30 hover:bg-primary/20' 
                 : 'bg-white text-on-surface-variant border-outline-variant/30 hover:bg-surface-variant/30'
             }`}
             title="Alineación magnética con otros elementos"
           >
-            Alineación
+            <Magnet size={14} />
+            <span className="hidden sm:inline">Alineación</span>
           </button>
           <button
             type="button"
@@ -987,14 +989,17 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
                 return next;
               });
             }}
-            className={`px-3 py-1.5 rounded-full font-sans text-[12px] font-semibold transition-all border cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full font-sans text-[12px] font-semibold transition-all border cursor-pointer ${
               isAllSelected 
                 ? 'bg-primary/20 text-primary border-primary hover:bg-primary/30' 
                 : 'bg-white text-on-surface-variant border-outline-variant/30 hover:bg-surface-variant/30'
             }`}
             title="Seleccionar todos los estantes y cabezales para arrastrar en bloque"
           >
-            {isAllSelected ? 'Deseleccionar Todo' : 'Seleccionar Todo'}
+            <Layers size={14} />
+            <span className="hidden sm:inline">
+              {isAllSelected ? 'Deseleccionar Todo' : 'Seleccionar Todo'}
+            </span>
           </button>
           {copiedConfig && (
             <button
@@ -1009,20 +1014,21 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
                 });
                 toast.success('Estante pegado en el centro.');
               }}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-secondary text-white hover:bg-secondary/95 rounded-full font-sans text-[12.5px] font-semibold transition-all shadow-sm cursor-pointer animate-in fade-in zoom-in duration-200"
+              className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-secondary text-white hover:bg-secondary/95 rounded-full font-sans text-[12.5px] font-semibold transition-all shadow-sm cursor-pointer animate-in fade-in zoom-in duration-200"
               title="Pegar estante con la configuración copiada"
             >
               <ClipboardIcon size={14} />
-              Pegar Estante
+              <span className="hidden sm:inline">Pegar Estante</span>
             </button>
           )}
           <button
             type="button"
             onClick={() => onAddElement()}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[12.5px] font-semibold transition-all shadow-sm cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[12.5px] font-semibold transition-all shadow-sm cursor-pointer"
+            title="Agregar estante"
           >
             <Rows3 size={14} />
-            Agregar Estante
+            <span className="hidden sm:inline">Agregar Estante</span>
           </button>
         </div>
       </div>
