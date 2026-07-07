@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, Fragment, FormEvent } from 'react';
-import { Plus, X, Trash2, MapPin, Building2, History, Rows3, RotateCw, Copy, Clipboard as ClipboardIcon } from 'lucide-react';
+import { Plus, X, Trash2, MapPin, Building2, History, Rows3, RotateCw, Copy, Clipboard as ClipboardIcon, Minus, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { Aisle, Cabezal, CabezalPago, PaymentType, DiagramElement } from '../types';
 import { db, isFirebaseConfigured } from '../firebase';
 import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
@@ -756,6 +756,50 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
   const [activeGuideX, setActiveGuideX] = useState<number | null>(null);
   const [activeGuideY, setActiveGuideY] = useState<number | null>(null);
 
+  // Zoom and responsive auto-fit states
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState<number>(1);
+  const [isAutoFit, setIsAutoFit] = useState<boolean>(true);
+
+  const handleAutoFit = () => {
+    if (wrapperRef.current) {
+      const parentWidth = wrapperRef.current.clientWidth;
+      // Subtract 32px for padding so it doesn't touch the borders on small screens
+      const targetWidth = Math.max(300, parentWidth - 32);
+      const computedZoom = Math.min(1.2, targetWidth / 1000);
+      setZoom(Number(computedZoom.toFixed(3)));
+    }
+  };
+
+  useEffect(() => {
+    if (!isAutoFit) return;
+
+    handleAutoFit();
+
+    if (typeof window !== 'undefined' && 'ResizeObserver' in window && wrapperRef.current) {
+      const observer = new ResizeObserver(() => {
+        handleAutoFit();
+      });
+      observer.observe(wrapperRef.current);
+      return () => observer.disconnect();
+    }
+  }, [isAutoFit]);
+
+  const handleZoomOut = () => {
+    setIsAutoFit(false);
+    setZoom(prev => Math.max(0.25, Number((prev - 0.1).toFixed(2))));
+  };
+
+  const handleZoomIn = () => {
+    setIsAutoFit(false);
+    setZoom(prev => Math.min(2.0, Number((prev + 0.1).toFixed(2))));
+  };
+
+  const handleZoomReset = () => {
+    setIsAutoFit(false);
+    setZoom(1.0);
+  };
+
   const toggleSnapToGrid = () => {
     setSnapToGrid(prev => {
       const next = !prev;
@@ -988,129 +1032,195 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
           <p className="font-sans text-[15px] text-on-surface-variant">Crea un cabezal o agrega un estante para empezar a armar el plano.</p>
         </div>
       ) : (
-        <div className="w-full overflow-auto max-h-[80vh] border border-outline-variant/30 rounded-2xl bg-surface-variant/10 shadow-inner">
+        <div className="relative w-full border border-outline-variant/30 rounded-2xl bg-surface-variant/10 shadow-inner overflow-hidden">
+          {/* Scrollable Viewport */}
           <div
-            ref={containerRef}
-            onPointerMove={handlePointerMove}
-            onPointerDown={handleBackgroundPointerDown}
-            className="relative w-[1000px] h-[625px] bg-surface-variant/20 select-none overflow-hidden"
-            style={snapToGrid ? {
-              backgroundImage: 'radial-gradient(circle, rgba(62, 158, 87, 0.15) 1.5px, transparent 1.5px)',
-              backgroundSize: '2.5% 2.5%'
-            } : {}}
+            ref={wrapperRef}
+            className="w-full overflow-auto max-h-[80vh] p-4 flex justify-start items-start md:justify-center"
           >
-          {/* Alignment guide lines */}
-          {activeGuideX !== null && (
+            {/* Sizing wrapper representing the scaled bounding dimensions */}
             <div
-              style={{ left: `${activeGuideX}%` }}
-              className="absolute top-0 bottom-0 w-[1.5px] border-l border-dashed border-red-500 pointer-events-none z-20"
-            />
-          )}
-          {activeGuideY !== null && (
-            <div
-              style={{ top: `${activeGuideY}%` }}
-              className="absolute left-0 right-0 h-[1.5px] border-t border-dashed border-red-500 pointer-events-none z-20"
-            />
-          )}
-
-          {elements.map(el => {
-            let x = el.x;
-            let y = el.y;
-            if (drag && dragPos) {
-              if (isAllSelected) {
-                const startPos = dragStartPositionsRef.current.elements.find(item => item.id === el.id);
-                if (startPos) {
-                  const dx = dragPos.x - draggedStartPosRef.current.x;
-                  const dy = dragPos.y - draggedStartPosRef.current.y;
-                  x = Math.min(100, Math.max(0, startPos.x + dx));
-                  y = Math.min(100, Math.max(0, startPos.y + dy));
-                }
-              } else if (drag.type === 'element' && drag.id === el.id) {
-                x = dragPos.x;
-                y = dragPos.y;
-              }
-            }
-            const isSelected = selectedElementId === el.id;
-            const showActiveHighlight = isSelected || isAllSelected;
-            return (
+              style={{
+                width: `${1000 * zoom}px`,
+                height: `${625 * zoom}px`,
+                position: 'relative',
+                flexShrink: 0,
+              }}
+              className="mx-auto"
+            >
+              {/* Actual Canvas */}
               <div
-                key={el.id}
-                onPointerDown={(e) => handlePointerDown(e, 'element', el.id, el.x, el.y)}
-                onPointerUp={handlePointerUp}
+                ref={containerRef}
+                onPointerMove={handlePointerMove}
+                onPointerDown={handleBackgroundPointerDown}
+                className="absolute top-0 left-0 w-[1000px] h-[625px] bg-surface-variant/20 select-none overflow-hidden origin-top-left"
                 style={{
-                  left: `${x}%`,
-                  top: `${y}%`,
-                  transform: `translate(-50%, -50%) rotate(${el.rotation}deg)`,
-                  width: el.width !== undefined ? `${el.width}px` : undefined,
-                  height: el.height !== undefined ? `${el.height}px` : undefined,
+                  transform: `scale(${zoom})`,
+                  ...(snapToGrid ? {
+                    backgroundImage: 'radial-gradient(circle, rgba(62, 158, 87, 0.15) 1.5px, transparent 1.5px)',
+                    backgroundSize: '2.5% 2.5%'
+                  } : {})
                 }}
-                className={`absolute bg-primary/10 border-2 rounded-md shadow-sm cursor-grab active:cursor-grabbing touch-none flex items-center justify-center ${
-                  showActiveHighlight ? 'border-primary ring-2 ring-primary/20 bg-primary/20' : 'border-primary/40'
-                } ${
-                  el.width !== undefined ? '' : 'w-20 sm:w-24'
-                } ${
-                  el.height !== undefined ? '' : 'h-8 sm:h-9'
-                }`}
               >
-                {isSelected && (
-                  <>
-                    <button
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => { e.stopPropagation(); onUpdateElement(el.id, { rotation: (el.rotation + 90) % 180 }); }}
-                      style={{ transform: `rotate(${-el.rotation}deg)` }}
-                      className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-white border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:text-primary shadow-sm cursor-pointer"
-                      title="Rotar estante"
-                    >
-                      <RotateCw size={11} />
-                    </button>
-                    <button
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => { e.stopPropagation(); onDeleteElement(el.id); setSelectedElementId(null); }}
-                      style={{ transform: `rotate(${-el.rotation}deg)` }}
-                      className="absolute -top-2.5 -left-2.5 w-5 h-5 rounded-full bg-white border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:text-error shadow-sm cursor-pointer"
-                      title="Eliminar estante"
-                    >
-                      <X size={11} />
-                    </button>
-                  </>
-                )}
-              </div>
-            );
-          })}
+              {/* Alignment guide lines */}
+              {activeGuideX !== null && (
+                <div
+                  style={{ left: `${activeGuideX}%` }}
+                  className="absolute top-0 bottom-0 w-[1.5px] border-l border-dashed border-red-500 pointer-events-none z-20"
+                />
+              )}
+              {activeGuideY !== null && (
+                <div
+                  style={{ top: `${activeGuideY}%` }}
+                  className="absolute left-0 right-0 h-[1.5px] border-t border-dashed border-red-500 pointer-events-none z-20"
+                />
+              )}
 
-           {cabezales.map(cab => {
-            let x = cab.positionX ?? 50;
-            let y = cab.positionY ?? 50;
-            if (drag && dragPos) {
-              if (isAllSelected) {
-                const startPos = dragStartPositionsRef.current.cabezales.find(item => item.id === cab.id);
-                if (startPos) {
-                  const dx = dragPos.x - draggedStartPosRef.current.x;
-                  const dy = dragPos.y - draggedStartPosRef.current.y;
-                  x = Math.min(100, Math.max(0, startPos.x + dx));
-                  y = Math.min(100, Math.max(0, startPos.y + dy));
+              {elements.map(el => {
+                let x = el.x;
+                let y = el.y;
+                if (drag && dragPos) {
+                  if (isAllSelected) {
+                    const startPos = dragStartPositionsRef.current.elements.find(item => item.id === el.id);
+                    if (startPos) {
+                      const dx = dragPos.x - draggedStartPosRef.current.x;
+                      const dy = dragPos.y - draggedStartPosRef.current.y;
+                      x = Math.min(100, Math.max(0, startPos.x + dx));
+                      y = Math.min(100, Math.max(0, startPos.y + dy));
+                    }
+                  } else if (drag.type === 'element' && drag.id === el.id) {
+                    x = dragPos.x;
+                    y = dragPos.y;
+                  }
                 }
-              } else if (drag.type === 'cabezal' && drag.id === cab.id) {
-                x = dragPos.x;
-                y = dragPos.y;
-              }
-            }
-            const isRented = !!cab.tenantCompany;
-            return (
-              <button
-                key={cab.id}
-                onPointerDown={(e) => handlePointerDown(e, 'cabezal', cab.id, cab.positionX ?? 50, cab.positionY ?? 50)}
-                onPointerUp={handlePointerUp}
-                style={{ left: `${x}%`, top: `${y}%` }}
-                className={`absolute -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center justify-center w-16 h-11 sm:w-20 sm:h-14 rounded-lg border-2 shadow-md cursor-grab active:cursor-grabbing touch-none font-sans font-bold px-1 py-0.5 text-center transition-colors overflow-hidden ${
-                  isRented ? 'bg-primary/10 border-primary text-primary' : 'bg-white border-outline-variant/50 text-on-surface-variant'
-                } ${isAllSelected ? 'ring-2 ring-primary border-primary bg-primary/10' : ''}`}
-              >
-                <span className={`w-full leading-tight break-words ${getDiagramLabelSizeClass(cab.label)}`}>{cab.label}</span>
-                <span className="w-full font-mono text-[7px] font-normal opacity-70 leading-none truncate mt-0.5">{isRented ? cab.tenantCompany : 'Vacante'}</span>
-              </button>
-            );
-          })}
+                const isSelected = selectedElementId === el.id;
+                const showActiveHighlight = isSelected || isAllSelected;
+                return (
+                  <div
+                    key={el.id}
+                    onPointerDown={(e) => handlePointerDown(e, 'element', el.id, el.x, el.y)}
+                    onPointerUp={handlePointerUp}
+                    style={{
+                      left: `${x}%`,
+                      top: `${y}%`,
+                      transform: `translate(-50%, -50%) rotate(${el.rotation}deg)`,
+                      width: el.width !== undefined ? `${el.width}px` : undefined,
+                      height: el.height !== undefined ? `${el.height}px` : undefined,
+                    }}
+                    className={`absolute bg-primary/10 border-2 rounded-md shadow-sm cursor-grab active:cursor-grabbing touch-none flex items-center justify-center ${
+                      showActiveHighlight ? 'border-primary ring-2 ring-primary/20 bg-primary/20' : 'border-primary/40'
+                    } ${
+                      el.width !== undefined ? '' : 'w-20 sm:w-24'
+                    } ${
+                      el.height !== undefined ? '' : 'h-8 sm:h-9'
+                    }`}
+                  >
+                    {isSelected && (
+                      <>
+                        <button
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => { e.stopPropagation(); onUpdateElement(el.id, { rotation: (el.rotation + 90) % 180 }); }}
+                          style={{ transform: `rotate(${-el.rotation}deg)` }}
+                          className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-white border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:text-primary shadow-sm cursor-pointer"
+                          title="Rotar estante"
+                        >
+                          <RotateCw size={11} />
+                        </button>
+                        <button
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => { e.stopPropagation(); onDeleteElement(el.id); setSelectedElementId(null); }}
+                          style={{ transform: `rotate(${-el.rotation}deg)` }}
+                          className="absolute -top-2.5 -left-2.5 w-5 h-5 rounded-full bg-white border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:text-error shadow-sm cursor-pointer"
+                          title="Eliminar estante"
+                        >
+                          <X size={11} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+
+               {cabezales.map(cab => {
+                let x = cab.positionX ?? 50;
+                let y = cab.positionY ?? 50;
+                if (drag && dragPos) {
+                  if (isAllSelected) {
+                    const startPos = dragStartPositionsRef.current.cabezales.find(item => item.id === cab.id);
+                    if (startPos) {
+                      const dx = dragPos.x - draggedStartPosRef.current.x;
+                      const dy = dragPos.y - draggedStartPosRef.current.y;
+                      x = Math.min(100, Math.max(0, startPos.x + dx));
+                      y = Math.min(100, Math.max(0, startPos.y + dy));
+                    }
+                  } else if (drag.type === 'cabezal' && drag.id === cab.id) {
+                    x = dragPos.x;
+                    y = dragPos.y;
+                  }
+                }
+                const isRented = !!cab.tenantCompany;
+                return (
+                  <button
+                    key={cab.id}
+                    onPointerDown={(e) => handlePointerDown(e, 'cabezal', cab.id, cab.positionX ?? 50, cab.positionY ?? 50)}
+                    onPointerUp={handlePointerUp}
+                    style={{ left: `${x}%`, top: `${y}%` }}
+                    className={`absolute -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center justify-center w-16 h-11 sm:w-20 sm:h-14 rounded-lg border-2 shadow-md cursor-grab active:cursor-grabbing touch-none font-sans font-bold px-1 py-0.5 text-center transition-colors overflow-hidden ${
+                      isRented ? 'bg-primary/10 border-primary text-primary' : 'bg-white border-outline-variant/50 text-on-surface-variant'
+                    } ${isAllSelected ? 'ring-2 ring-primary border-primary bg-primary/10' : ''}`}
+                  >
+                    <span className={`w-full leading-tight break-words ${getDiagramLabelSizeClass(cab.label)}`}>{cab.label}</span>
+                    <span className="w-full font-mono text-[7px] font-normal opacity-70 leading-none truncate mt-0.5">{isRented ? cab.tenantCompany : 'Vacante'}</span>
+                  </button>
+                );
+              })}
+              </div>
+            </div>
+          </div>
+
+          {/* Floating Zoom Control Panel */}
+          <div className="absolute bottom-4 right-4 z-30 bg-white/80 backdrop-blur-md border border-outline-variant/40 rounded-full px-3 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.08)] flex items-center gap-1.5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <button
+              type="button"
+              onClick={handleZoomOut}
+              className="w-7 h-7 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/40 transition-colors cursor-pointer"
+              title="Alejar Zoom (-)"
+            >
+              <Minus size={14} />
+            </button>
+            
+            <button
+              type="button"
+              onClick={handleZoomReset}
+              className="px-2 py-0.5 rounded text-[11px] font-mono font-semibold text-on-surface-variant hover:bg-surface-variant/40 transition-colors cursor-pointer"
+              title="Restablecer a 100%"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+
+            <button
+              type="button"
+              onClick={handleZoomIn}
+              className="w-7 h-7 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/40 transition-colors cursor-pointer"
+              title="Acercar Zoom (+)"
+            >
+              <Plus size={14} />
+            </button>
+
+            <div className="w-[1px] h-4 bg-outline-variant/40 mx-0.5" />
+
+            <button
+              type="button"
+              onClick={() => setIsAutoFit(true)}
+              className={`px-3 py-1 rounded-full font-sans text-[11px] font-bold transition-all border cursor-pointer ${
+                isAutoFit 
+                  ? 'bg-primary/10 text-primary border-primary/20' 
+                  : 'bg-transparent text-on-surface-variant border-transparent hover:bg-surface-variant/40'
+              }`}
+              title="Ajustar responsivo automáticamente"
+            >
+              Ajustar
+            </button>
           </div>
         </div>
       )}
