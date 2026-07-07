@@ -65,6 +65,7 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
 
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printWeekKey, setPrintWeekKey] = useState('');
+  const [printFilter, setPrintFilter] = useState<'all' | 'arrived' | 'pending'>('all');
 
   const currentWeekKey = getWeekKey(new Date().toISOString());
   const currentWeekTotal = useMemo(
@@ -92,10 +93,16 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
     return Array.from(keys).sort((a, b) => b.localeCompare(a));
   }, [weekGroups, currentWeekKey]);
 
-  const printOrders = useMemo(
-    () => purchaseOrders.filter(o => getWeekKey(o.fecha) === printWeekKey).sort((a, b) => a.fecha.localeCompare(b.fecha)),
-    [purchaseOrders, printWeekKey]
-  );
+  const printOrders = useMemo(() => {
+    let filtered = purchaseOrders.filter(o => getWeekKey(o.fecha) === printWeekKey);
+    if (printFilter === 'arrived') {
+      filtered = filtered.filter(o => o.arrived === true);
+    } else if (printFilter === 'pending') {
+      filtered = filtered.filter(o => !o.arrived);
+    }
+    return filtered.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  }, [purchaseOrders, printWeekKey, printFilter]);
+
   const printTotal = printOrders.reduce((sum, o) => sum + (o.monto || 0), 0);
 
   const handleAdd = (e: FormEvent) => {
@@ -113,6 +120,7 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
       monto: montoNum,
       user: user?.displayName || user?.fullName || user?.username || '',
       lastUpdated: new Date().toISOString(),
+      arrived: false,
     });
     toast.success('Orden de compra registrada con éxito.');
     setShowAddModal(false);
@@ -300,11 +308,32 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
                                   </div>
                                 ) : (
                                   <div className="flex items-center justify-between gap-3 rounded-xl px-2 py-1.5 hover:bg-white/40 transition-colors">
-                                    <div className="min-w-0 flex-1">
-                                      <span className="font-sans text-[13.5px] font-semibold text-on-surface truncate block">{o.empresa}</span>
-                                      <span className="font-mono text-[11px] text-on-surface-variant">{formatShortDate(o.fecha)} · N° {o.numeroOrden}</span>
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                      <button
+                                        onClick={() => canEdit && onUpdatePurchaseOrder(o.id, { arrived: !o.arrived })}
+                                        disabled={!canEdit}
+                                        className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                                          o.arrived
+                                            ? 'bg-green-600 border-green-600 text-white'
+                                            : 'border-outline-variant/60 hover:border-primary bg-white'
+                                        } ${canEdit ? 'cursor-pointer' : 'cursor-default opacity-80'}`}
+                                        title={o.arrived ? 'Marcar como pendiente de entrega' : 'Marcar como entregado (Llegó)'}
+                                      >
+                                        {o.arrived && <Check size={12} strokeWidth={3} />}
+                                      </button>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className={`font-sans text-[13.5px] font-semibold truncate block ${o.arrived ? 'text-on-surface/50 line-through' : 'text-on-surface'}`}>{o.empresa}</span>
+                                          {o.arrived && (
+                                            <span className="bg-green-100 text-green-700 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">
+                                              Llegó
+                                            </span>
+                                          )}
+                                        </div>
+                                        <span className="font-mono text-[11px] text-on-surface-variant">{formatShortDate(o.fecha)} · N° {o.numeroOrden}</span>
+                                      </div>
                                     </div>
-                                    <span className="font-mono text-[13.5px] font-bold text-on-surface flex-shrink-0">{formatMoney(o.monto)}</span>
+                                    <span className={`font-mono text-[13.5px] font-bold flex-shrink-0 ${o.arrived ? 'text-on-surface/50' : 'text-on-surface'}`}>{formatMoney(o.monto)}</span>
                                     {canEdit && (
                                       <div className="flex gap-1 flex-shrink-0">
                                         <button onClick={() => startEditOrder(o)} className="text-on-surface-variant hover:text-primary p-1 cursor-pointer" title="Editar"><Pencil size={13} /></button>
@@ -331,17 +360,21 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
       <div className="hidden print:block w-full text-black font-sans bg-white p-2">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold">Súper Samán — Órdenes de Compra (ODC)</h1>
-          <p className="text-sm mt-1 capitalize">{printWeekKey && formatWeekLabel(printWeekKey)}</p>
+          <p className="text-sm mt-1 capitalize">
+            {printWeekKey && formatWeekLabel(printWeekKey)}
+            {printFilter === 'arrived' && ' — Solo Entregadas (Llegaron)'}
+            {printFilter === 'pending' && ' — Solo Pendientes (Por Llegar)'}
+          </p>
         </div>
         <div className="mb-5 text-sm flex flex-col gap-1">
           <div><strong>Tope semanal:</strong> {formatMoney(weeklyLimit)}</div>
-          <div><strong>Total de la semana:</strong> {formatMoney(printTotal)}</div>
+          <div><strong>Total del reporte:</strong> {formatMoney(printTotal)}</div>
           <div>
-            <strong>{printTotal > weeklyLimit ? 'Excedido por' : 'Restante'}:</strong> {formatMoney(Math.abs(weeklyLimit - printTotal))}
+            <strong>Diferencia del reporte vs Tope:</strong> {formatMoney(Math.abs(weeklyLimit - printTotal))}
           </div>
         </div>
         {printOrders.length === 0 ? (
-          <p className="text-sm">No hay órdenes registradas en esta semana.</p>
+          <p className="text-sm">No hay órdenes registradas en esta semana que coincidan con el filtro.</p>
         ) : (
           <table className="w-full border-collapse">
             <thead>
@@ -349,6 +382,7 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
                 <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono text-left">Fecha</th>
                 <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono text-left">Empresa</th>
                 <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono text-left">N° Orden</th>
+                <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono text-left">Estado</th>
                 <th className="border-b-2 border-black py-2.5 text-sm font-bold font-mono text-right">Monto</th>
               </tr>
             </thead>
@@ -358,13 +392,14 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
                   <td className="py-3 text-sm border-b border-gray-200">{formatShortDate(o.fecha)}</td>
                   <td className="py-3 text-sm border-b border-gray-200">{o.empresa}</td>
                   <td className="py-3 text-sm border-b border-gray-200">{o.numeroOrden}</td>
+                  <td className="py-3 text-sm border-b border-gray-200">{o.arrived ? 'Llegó' : 'Pendiente'}</td>
                   <td className="py-3 text-sm border-b border-gray-200 text-right">{formatMoney(o.monto)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={3} className="py-3 text-sm font-bold text-right border-t-2 border-black">Total</td>
+                <td colSpan={4} className="py-3 text-sm font-bold text-right border-t-2 border-black">Total</td>
                 <td className="py-3 text-sm font-bold text-right border-t-2 border-black">{formatMoney(printTotal)}</td>
               </tr>
             </tfoot>
@@ -397,6 +432,18 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
                       {formatWeekLabel(wk)}{wk === currentWeekKey ? ' (actual)' : ''}
                     </option>
                   ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Filtrar por estado de entrega</label>
+                <select
+                  value={printFilter}
+                  onChange={(e) => setPrintFilter(e.target.value as any)}
+                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3.5 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+                >
+                  <option value="all">Imprimir todo</option>
+                  <option value="arrived">Imprimir solo lo que ya llegó</option>
+                  <option value="pending">Imprimir lo que falta por llegar</option>
                 </select>
               </div>
               <div className="flex gap-3 mt-2">

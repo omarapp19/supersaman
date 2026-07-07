@@ -86,6 +86,7 @@ export interface PurchaseOrder {
   monto: number;
   user: string;
   lastUpdated: string;
+  arrived?: boolean;
 }
 
 
