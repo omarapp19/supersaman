@@ -5,6 +5,7 @@ import { CloudOff, ArrowLeft, MoreVertical, Search, ScanBarcode, ArrowDownAZ, Pl
 import { db, isFirebaseConfigured } from '../firebase';
 import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { BarcodeScanner } from './BarcodeScanner';
+import { RowActionButton } from './ui/RowActionButton';
 import { useToast } from './Toast';
 
 interface PasilloDetailViewProps {
@@ -376,8 +377,8 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
       <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-right-4 duration-500 pb-12">
       {isOffline && (
         <div className="offline-banner w-full py-1.5 flex justify-center items-center gap-2 shadow-sm rounded-lg mb-4 animate-in fade-in slide-in-from-top-2">
-          <CloudOff size={14} className="text-[#745815]" />
-          <span className="font-mono text-[13px] font-medium text-[#745815]">Modo offline activo</span>
+          <CloudOff size={14} className="text-on-tertiary-fixed-variant" />
+          <span className="font-mono text-[13px] font-medium text-on-tertiary-fixed-variant">Modo offline activo</span>
         </div>
       )}
 
@@ -494,46 +495,43 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                       </div>
 
                       {/* Product Info */}
-                      <div className="flex-grow flex flex-col justify-center overflow-hidden pr-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-sans text-[16px] font-semibold text-[#281C19] leading-snug">{product.name}</h3>
+                      <div className="flex-grow flex flex-col justify-center overflow-hidden pr-2 min-w-0 gap-1">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <h3 className="font-sans text-[16px] font-semibold text-on-surface leading-snug truncate min-w-0">{product.name}</h3>
+                          {(user?.role === 'operador' || user?.role === 'admin') && (
+                            <button
+                              onClick={() => {
+                                handleStartEditProduct(product);
+                                fetchAllProducts(); // Carga las empresas en segundo plano
+                              }}
+                              className="text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors p-1.5 rounded-lg inline-flex items-center justify-center flex-shrink-0 cursor-pointer"
+                              title="Editar producto"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          )}
                           {product.status === 'normal' && (
-                            <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-full font-mono text-[10px] font-bold uppercase">Normal</span>
+                            <span className="px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full font-mono text-[10px] font-bold uppercase flex-shrink-0">Normal</span>
                           )}
                           {product.status === 'bajo' && (
-                            <span className="px-2 py-0.5 bg-amber-500/10 text-amber-700 border border-amber-500/20 rounded-full font-mono text-[10px] font-bold uppercase">Bajo</span>
+                            <span className="px-2 py-0.5 bg-tertiary-container/40 text-on-tertiary-fixed-variant border border-tertiary-fixed-dim/60 rounded-full font-mono text-[10px] font-bold uppercase flex-shrink-0">Bajo</span>
                           )}
                           {product.status === 'crítico' && (
-                            <span className="px-2 py-0.5 bg-rose-500/10 text-rose-700 border border-rose-500/20 rounded-full font-mono text-[10px] font-bold uppercase animate-pulse">Crítico</span>
+                            <span className="px-2 py-0.5 bg-error-container text-on-error-container border border-error/20 rounded-full font-mono text-[10px] font-bold uppercase animate-pulse flex-shrink-0">Crítico</span>
                           )}
                         </div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-mono text-[13px] text-[#4f6b53]">
-                              {product.brand} • SKU: {product.sku || 'N/A'} • Caja: {product.und_x_caja ?? 0} und{product.company ? ` • Empresa: ${product.company}` : ''}{product.sellingUnit === 'kg' ? ' • Venta: Kg' : ''}
-                            </span>
-                            {(user?.role === 'operador' || user?.role === 'admin') && (
-                              <button
-                                onClick={() => {
-                                  handleStartEditProduct(product);
-                                  fetchAllProducts(); // Carga las empresas en segundo plano
-                                }}
-                                className="text-primary hover:text-primary/70 transition-colors p-0.5 inline-flex items-center gap-0.5 cursor-pointer"
-                                title="Editar producto"
-                              >
-                                <Pencil size={12} />
-                              </button>
-                            )}
-                          </div>
+                        <span className="font-mono text-[12px] text-on-surface-variant truncate block">
+                          {product.brand} • SKU: {product.sku || 'N/A'} • Caja: {product.und_x_caja ?? 0} und{product.company ? ` • ${product.company}` : ''}{product.sellingUnit === 'kg' ? ' • Venta: Kg' : ''}
+                        </span>
                       </div>
 
                       {/* Delete Button */}
-                      <button
+                      <RowActionButton
+                        icon={Trash2}
+                        variant="danger"
+                        label="Eliminar producto"
                         onClick={() => setProductToDelete(product)}
-                        className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-red-100 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
-                        title="Eliminar producto"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      />
                     </div>
                   );
                 })
@@ -677,8 +675,8 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setProductToDelete(null)}>
           <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 flex flex-col items-center text-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
-                <Trash2 size={26} className="text-red-600" />
+              <div className="w-14 h-14 rounded-full bg-error-container flex items-center justify-center">
+                <Trash2 size={26} className="text-error" />
               </div>
               <div>
                 <h3 className="font-sans text-[20px] font-bold text-on-surface">Eliminar Producto</h3>
@@ -695,7 +693,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
                 </button>
                 <button
                   onClick={() => handleDeleteProduct(productToDelete)}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all"
+                  className="flex-1 bg-error hover:bg-error/90 text-on-error font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all"
                 >
                   Eliminar
                 </button>

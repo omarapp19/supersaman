@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { NotFoundException, BarcodeFormat, DecodeHintType } from '@zxing/library';
 import { X, Camera, FlipHorizontal } from 'lucide-react';
+import { LoadingIndicator } from './ui/LoadingIndicator';
 
 interface BarcodeScannerProps {
   onScan: (code: string) => void;
@@ -172,6 +173,10 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
             >
               Cerrar
             </button>
+          </div>
+        ) : cameras.length === 0 ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <LoadingIndicator label="Iniciando cámara…" dark />
           </div>
         ) : (
           <>

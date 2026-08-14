@@ -156,19 +156,12 @@ export function Login({ onMockLogin }: LoginProps) {
 
         {/* Demo Mode Notice */}
         {!isFirebaseConfigured && (
-          <div className="bg-amber-500/10 border border-amber-500/20 text-amber-800 p-3.5 rounded-2xl flex gap-3 items-start mb-6 text-[13px] leading-relaxed">
-            <ShieldAlert size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="bg-tertiary-container/35 border border-tertiary-fixed-dim/60 text-on-tertiary-fixed-variant p-3.5 rounded-2xl flex gap-3 items-start mb-6 text-[13px] leading-relaxed">
+            <ShieldAlert size={18} className="flex-shrink-0 mt-0.5" />
             <div>
               <span className="font-bold block">Modo Demo Activo</span>
               Firebase no está configurado aún. Por favor inicia sesión con las credenciales de administrador locales.
             </div>
-          </div>
-        )}
-
-        {/* Error Message */}
-        {error && (
-          <div className="bg-error-container text-on-error-container border border-error/10 p-3.5 rounded-2xl mb-6 text-[13.5px] font-medium animate-in fade-in duration-200">
-            {error}
           </div>
         )}
 
@@ -194,16 +187,21 @@ export function Login({ onMockLogin }: LoginProps) {
           <div className="flex flex-col gap-1.5">
             <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider pl-1">Contraseña</label>
             <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/70" size={18} />
+              <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 ${error ? 'text-error' : 'text-on-surface-variant/70'}`} size={18} />
               <input
                 type="password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
-                className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3.5 pl-11 pr-4 font-sans text-[15px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm transition-all text-on-surface disabled:opacity-50"
+                className={`w-full bg-white border rounded-2xl py-3.5 pl-11 pr-4 font-sans text-[15px] focus:outline-none focus:ring-2 shadow-sm transition-all text-on-surface disabled:opacity-50 ${
+                  error ? 'border-error border-2 focus:ring-error/20' : 'border-outline-variant/50 focus:ring-primary/20'
+                }`}
               />
             </div>
+            {error && (
+              <span className="text-[12px] text-error font-semibold pl-2 animate-in fade-in duration-200">{error}</span>
+            )}
           </div>
 
           {/* Submit Button */}

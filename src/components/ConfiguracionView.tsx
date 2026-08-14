@@ -237,13 +237,13 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                   <span className="font-mono text-[12px] text-on-surface-variant">Notificar inmediatamente a los administradores al detectar quiebre.</span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={pushAlerts} 
-                    onChange={togglePushAlerts} 
+                  <input
+                    type="checkbox"
+                    checked={pushAlerts}
+                    onChange={togglePushAlerts}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-outline-variant/50 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  <div className="w-11 h-6 bg-outline-variant/50 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-outline-variant after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
 
@@ -253,16 +253,16 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                   <span className="font-mono text-[12px] text-on-surface-variant">Guardar datos locales y subirlos cuando vuelva la red.</span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={offlineSync} 
+                  <input
+                    type="checkbox"
+                    checked={offlineSync}
                     onChange={() => {
                       setOfflineSync(!offlineSync);
                       toast.info(offlineSync ? 'Sincronización offline desactivada.' : 'Sincronización offline activada.');
-                    }} 
+                    }}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-outline-variant/50 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  <div className="w-11 h-6 bg-outline-variant/50 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-outline-variant after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
             </div>
@@ -299,12 +299,12 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
 
             <div className="flex flex-col gap-3">
               {users.map((u) => {
-                const avatarColorClass = 
-                  u.role === 'admin' 
-                    ? 'from-primary/20 to-primary/5 text-primary' 
+                const avatarColorClass =
+                  u.role === 'admin'
+                    ? 'from-primary/20 to-primary/5 text-primary'
                     : u.role === 'supervisor'
-                      ? 'from-blue-500/20 to-blue-500/5 text-blue-700'
-                      : 'from-amber-500/20 to-amber-500/5 text-amber-700';
+                      ? 'from-tertiary/25 to-tertiary/5 text-on-tertiary-fixed-variant'
+                      : 'from-secondary/20 to-secondary/5 text-secondary';
 
                 return (
                   <div 
@@ -322,8 +322,8 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-sans text-[16px] font-bold text-on-surface">{u.fullName}</span>
                           {u.role === 'admin' && <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full font-mono text-[10px] font-bold uppercase border border-primary/20">Admin</span>}
-                          {u.role === 'supervisor' && <span className="px-2 py-0.5 bg-blue-500/10 text-blue-700 rounded-full font-mono text-[10px] font-bold uppercase border border-blue-500/20">Supervisor</span>}
-                          {u.role === 'operador' && <span className="px-2 py-0.5 bg-amber-500/10 text-amber-700 rounded-full font-mono text-[10px] font-bold uppercase border border-amber-500/20">Operador</span>}
+                          {u.role === 'supervisor' && <span className="px-2 py-0.5 bg-tertiary-container/40 text-on-tertiary-fixed-variant rounded-full font-mono text-[10px] font-bold uppercase border border-tertiary-fixed-dim/60">Supervisor</span>}
+                          {u.role === 'operador' && <span className="px-2 py-0.5 bg-secondary-container text-on-secondary-container rounded-full font-mono text-[10px] font-bold uppercase border border-secondary/20">Operador</span>}
                         </div>
                         <span className="font-mono text-[12px] text-on-surface-variant">@{u.username}</span>
                         
@@ -380,7 +380,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
           {/* Firestore Database Management */}
           <div className="bg-card-surface rounded-3xl p-6 shadow-[0_4px_20px_rgba(40,28,25,0.05)]">
             <div className="flex items-center gap-3 mb-6">
-              <div className="bg-[#ba1a1a]/10 text-[#ba1a1a] p-2.5 rounded-2xl">
+              <div className="bg-error/10 text-error p-2.5 rounded-2xl">
                 <Database size={22} />
               </div>
               <div>
@@ -393,7 +393,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
               <button
                 onClick={() => setShowClearDbModal(true)}
                 disabled={dbActionLoading}
-                className="flex-1 bg-white border border-error/30 hover:bg-error/5 text-[#ba1a1a] rounded-full py-3.5 font-sans text-[14px] font-semibold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                className="flex-1 bg-white border border-error/30 hover:bg-error/5 text-error rounded-full py-3.5 font-sans text-[14px] font-semibold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
               >
                 <Trash2 size={16} />
                 {dbActionLoading ? 'Limpiando...' : 'Vaciar Base de Datos'}
@@ -419,7 +419,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
 
         {/* Right column - Quick Actions / Status */}
         <div className="flex flex-col gap-6">
-          <div className="bg-[#fff1ed] rounded-3xl p-6 shadow-[0_4px_20px_rgba(40,28,25,0.05)] border border-[#ffe9e4]">
+          <div className="bg-tertiary-container/30 rounded-3xl p-6 shadow-[0_4px_20px_rgba(40,28,25,0.05)] border border-tertiary-fixed-dim/40">
             <h3 className="font-sans text-[18px] font-bold text-on-surface mb-2 flex items-center gap-2">
               <Sparkles className="text-primary" size={20} />
               Saman AI Activo
@@ -463,11 +463,18 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
               <Shield size={20} className="text-secondary" />
               Seguridad e Info
             </h3>
-            <div className="font-mono text-[12px] text-on-surface-variant flex flex-col gap-2">
-              <div><strong className="text-on-surface">Rol:</strong> Administrador</div>
-              <div><strong className="text-on-surface">Sucursal ID:</strong> SAMAN-MAIN-001</div>
-              <div><strong className="text-on-surface">Versión App:</strong> 1.4.2</div>
-              <div><strong className="text-on-surface">Motor AI:</strong> Gemini-Flash-3.5-Saman</div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Rol', value: 'Administrador' },
+                { label: 'Sucursal ID', value: 'SAMAN-MAIN-001' },
+                { label: 'Versión App', value: '1.4.2' },
+                { label: 'Motor AI', value: 'Gemini-Flash-3.5-Saman' },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-white/50 rounded-2xl p-3 border border-outline-variant/20">
+                  <span className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider block mb-0.5">{label}</span>
+                  <span className="font-sans text-[13px] font-semibold text-on-surface break-words">{value}</span>
+                </div>
+              ))}
             </div>
         </div>
       </div>
@@ -605,8 +612,8 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowClearDbModal(false)}>
           <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 flex flex-col items-center text-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
-                <Trash2 size={26} className="text-red-600" />
+              <div className="w-14 h-14 rounded-full bg-error-container flex items-center justify-center">
+                <Trash2 size={26} className="text-error" />
               </div>
               <div>
                 <h3 className="font-sans text-[20px] font-bold text-on-surface">Vaciar Base de Datos</h3>
@@ -626,7 +633,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                     setShowClearDbModal(false);
                     await handleClearDatabaseAction();
                   }}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer"
+                  className="flex-1 bg-error hover:bg-error/90 text-on-error font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer"
                 >
                   Confirmar
                 </button>
@@ -641,8 +648,8 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setUserToDelete(null)}>
           <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 flex flex-col items-center text-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
-                <Trash2 size={26} className="text-red-600" />
+              <div className="w-14 h-14 rounded-full bg-error-container flex items-center justify-center">
+                <Trash2 size={26} className="text-error" />
               </div>
               <div>
                 <h3 className="font-sans text-[20px] font-bold text-on-surface">Eliminar Usuario</h3>
@@ -650,7 +657,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                   ¿Estás seguro de que deseas eliminar al usuario <strong>@{userToDelete.username}</strong> de la base de datos de perfiles?
                 </p>
                 {isFirebaseConfigured && (
-                  <p className="font-sans text-[12px] text-left text-amber-700 bg-amber-500/10 p-3 rounded-2xl border border-amber-500/20 mt-3">
+                  <p className="font-sans text-[12px] text-left text-on-tertiary-fixed-variant bg-tertiary-container/40 p-3 rounded-2xl border border-tertiary-fixed-dim/60 mt-3">
                     <strong>Nota de Seguridad:</strong> Esto remueve el perfil de Firestore, pero su acceso en <strong>Firebase Auth</strong> permanecerá activo. Para eliminar sus credenciales de forma permanente, debes borrar el usuario en la Consola de Firebase (pestaña Authentication).
                   </p>
                 )}
@@ -679,7 +686,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                       toast.success(`Usuario @${username} eliminado localmente.`);
                     }
                   }}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer"
+                  className="flex-1 bg-error hover:bg-error/90 text-on-error font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer"
                 >
                   Eliminar
                 </button>

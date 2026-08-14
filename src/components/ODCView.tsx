@@ -3,6 +3,7 @@ import { Plus, X, Trash2, Pencil, Check, FileSpreadsheet, AlertTriangle, Printer
 import { PurchaseOrder } from '../types';
 import { getDayKey, getWeekKey, formatWeekLabel, parseLocalDate } from '../utils/dateGrouping';
 import { useToast } from './Toast';
+import { SelectCheckbox } from './ui/SelectCheckbox';
 
 interface ODCViewProps {
   purchaseOrders: PurchaseOrder[];
@@ -74,7 +75,7 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
   );
   const pct = weeklyLimit > 0 ? Math.min(100, (currentWeekTotal / weeklyLimit) * 100) : 0;
   const overLimit = currentWeekTotal > weeklyLimit;
-  const barColor = overLimit ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-primary';
+  const barColor = overLimit ? 'bg-error' : pct >= 80 ? 'bg-tertiary' : 'bg-primary';
 
   const weekGroups = useMemo(() => {
     const map: Record<string, PurchaseOrder[]> = {};
@@ -242,7 +243,7 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
           <div className="flex justify-between items-center mt-2">
             <span className="font-mono text-[12px] text-on-surface-variant">{pct.toFixed(0)}% del tope usado</span>
             {overLimit ? (
-              <span className="flex items-center gap-1 font-mono text-[12px] font-bold text-red-600">
+              <span className="flex items-center gap-1 font-mono text-[12px] font-bold text-error">
                 <AlertTriangle size={13} />
                 Excedido por {formatMoney(currentWeekTotal - weeklyLimit)}
               </span>
@@ -278,7 +279,7 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
                 <div key={weekKey} className="bg-card-surface rounded-3xl shadow-[0_4px_20px_rgba(40,28,25,0.05)] overflow-hidden">
                   <div className="flex flex-wrap justify-between items-center gap-2 px-5 sm:px-6 py-4 border-b border-outline-variant/10">
                     <h3 className="font-sans text-[15px] sm:text-[16px] font-bold text-on-surface capitalize">{formatWeekLabel(weekOrders[0].fecha)}</h3>
-                    <span className={`px-3 py-1 rounded-full font-mono text-[12px] font-bold ${weekOverLimit ? 'bg-red-100 text-red-700' : 'bg-primary/10 text-primary'}`}>
+                    <span className={`px-3 py-1 rounded-full font-mono text-[12px] font-bold ${weekOverLimit ? 'bg-error-container text-on-error-container' : 'bg-primary/10 text-primary'}`}>
                       {formatMoney(weekTotal)} / {formatMoney(weeklyLimit)}
                     </span>
                   </div>
@@ -309,23 +310,19 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
                                 ) : (
                                   <div className="flex items-center justify-between gap-3 rounded-xl px-2 py-1.5 hover:bg-white/40 transition-colors">
                                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                                      <button
-                                        onClick={() => canEdit && onUpdatePurchaseOrder(o.id, { arrived: !o.arrived })}
-                                        disabled={!canEdit}
-                                        className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
-                                          o.arrived
-                                            ? 'bg-green-600 border-green-600 text-white'
-                                            : 'border-outline-variant/60 hover:border-primary bg-white'
-                                        } ${canEdit ? 'cursor-pointer' : 'cursor-default opacity-80'}`}
-                                        title={o.arrived ? 'Marcar como pendiente de entrega' : 'Marcar como entregado (Llegó)'}
-                                      >
-                                        {o.arrived && <Check size={12} strokeWidth={3} />}
-                                      </button>
+                                      <div className={canEdit ? '' : 'pointer-events-none opacity-80'}>
+                                        <SelectCheckbox
+                                          checked={!!o.arrived}
+                                          size="sm"
+                                          onChange={() => canEdit && onUpdatePurchaseOrder(o.id, { arrived: !o.arrived })}
+                                          label={o.arrived ? 'Marcar como pendiente de entrega' : 'Marcar como entregado (Llegó)'}
+                                        />
+                                      </div>
                                       <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2">
                                           <span className={`font-sans text-[13.5px] font-semibold truncate block ${o.arrived ? 'text-on-surface/50 line-through' : 'text-on-surface'}`}>{o.empresa}</span>
                                           {o.arrived && (
-                                            <span className="bg-green-100 text-green-700 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">
+                                            <span className="bg-primary/10 text-primary text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">
                                               Llegó
                                             </span>
                                           )}
@@ -507,8 +504,8 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print-hide" onClick={() => setOrderToDelete(null)}>
           <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 flex flex-col items-center text-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
-                <Trash2 size={26} className="text-red-600" />
+              <div className="w-14 h-14 rounded-full bg-error-container flex items-center justify-center">
+                <Trash2 size={26} className="text-error" />
               </div>
               <div>
                 <h3 className="font-sans text-[20px] font-bold text-on-surface">Eliminar Orden</h3>
@@ -526,7 +523,7 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
                     toast.success('Orden eliminada con éxito.');
                     setOrderToDelete(null);
                   }}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer"
+                  className="flex-1 bg-error hover:bg-error/90 text-on-error font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer"
                 >
                   Eliminar
                 </button>

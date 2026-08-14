@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, FormEvent } from 'react';
 import { ViewState, Aisle } from '../types';
 import { ClipboardList, Wine, Coffee, Milk, Plus, X, Trash2, Search, ScanBarcode, Pencil } from 'lucide-react';
 import { BarcodeScanner } from './BarcodeScanner';
+import { RowActionButton } from './ui/RowActionButton';
+import { LoadingIndicator } from './ui/LoadingIndicator';
 import { useToast } from './Toast';
 import { db, isFirebaseConfigured } from '../firebase';
 import { mockProductsByAisle } from '../data';
@@ -308,9 +310,8 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDe
           </div>
 
           {loadingAllProducts && globalSearchResults.length === 0 ? (
-            <div className="flex items-center justify-center gap-2 py-8 text-on-surface-variant font-mono text-[14px]">
-              <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              Cargando base de datos...
+            <div className="flex items-center justify-center py-8">
+              <LoadingIndicator label="Cargando base de datos..." />
             </div>
           ) : globalSearchResults.length === 0 ? (
             <div className="text-center py-8 text-on-surface-variant font-sans text-[15px]">
@@ -332,9 +333,9 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDe
                     key={product.id}
                     onClick={() => handleSelectProductResult({ product, aisle })}
                     className={`w-full text-left rounded-2xl p-3 border flex items-center gap-3 transition-all cursor-pointer ${
-                      isAisleAssignedToMe 
-                        ? 'bg-card-surface hover:bg-surface-variant/40 border-outline-variant/20' 
-                        : 'bg-red-50/20 border-red-200/50 hover:bg-red-50/40'
+                      isAisleAssignedToMe
+                        ? 'bg-card-surface hover:bg-surface-variant/40 border-outline-variant/20'
+                        : 'bg-error-container/25 border-error/20 hover:bg-error-container/40'
                     }`}
                   >
                     <div className="w-12 h-12 rounded-lg bg-white border border-outline-variant/30 flex items-center justify-center flex-shrink-0 font-sans text-[16px] font-bold text-on-surface-variant/40">
@@ -342,18 +343,18 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDe
                     </div>
                     <div className="flex-grow min-w-0">
                       <h4 className="font-sans text-[15px] font-semibold text-on-surface truncate">{product.name}</h4>
-                      <p className="font-mono text-[12px] text-[#4f6b53] truncate">
+                      <p className="font-mono text-[12px] text-on-surface-variant truncate">
                         {product.brand} • SKU: {product.sku || 'N/A'} • {aisle.name}
                       </p>
                     </div>
-                    
+
                     <div className="flex-shrink-0 pr-1">
                       {isAisleAssignedToMe ? (
-                        <span className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-full font-sans text-[11px] font-bold uppercase tracking-wider">
+                        <span className="px-2.5 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full font-sans text-[11px] font-bold uppercase tracking-wider">
                           Tu pasillo
                         </span>
                       ) : (
-                        <span className="px-2.5 py-0.5 bg-rose-500/10 text-rose-700 border border-rose-500/20 rounded-full font-sans text-[11px] font-bold uppercase tracking-wider" title={assignedToNames ? `Asignado a: ${assignedToNames}` : 'Sin operador asignado'}>
+                        <span className="px-2.5 py-0.5 bg-error-container text-on-error-container border border-error/20 rounded-full font-sans text-[11px] font-bold uppercase tracking-wider" title={assignedToNames ? `Asignado a: ${assignedToNames}` : 'Sin operador asignado'}>
                           {assignedToNames ? `Asignado a: ${assignedToNames.split(' ')[0]}` : 'No asignado'}
                         </span>
                       )}
@@ -417,14 +418,17 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDe
                   </div>
                   <div className="flex items-center gap-2">
                     {assignedOperators.length > 0 ? (
-                      <div className="bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 px-2.5 py-1 rounded-full font-sans text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                      <div className="bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-full font-sans text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
                         <span>Asignado: {assignedOperators.map(o => o.fullName.split(' ')[0]).join(', ')}</span>
                       </div>
                     ) : null}
                     {!isOperator && (
-                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                        <button
+                      <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <RowActionButton
+                          icon={Pencil}
+                          size="sm"
+                          label="Editar pasillo"
                           onClick={() => {
                             setAisleToEdit(aisle);
                             setAisleNumber(String(aisle.number));
@@ -432,18 +436,14 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDe
                             setError(null);
                             setShowAddModal(true);
                           }}
-                          className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
-                          title="Editar pasillo"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
+                        />
+                        <RowActionButton
+                          icon={Trash2}
+                          size="sm"
+                          variant="danger"
+                          label="Eliminar pasillo"
                           onClick={() => setAisleToDelete(aisle)}
-                          className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-red-100 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
-                          title="Eliminar pasillo"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        />
                       </div>
                     )}
                   </div>
@@ -544,8 +544,8 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDe
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setAisleToDelete(null)}>
           <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 flex flex-col items-center text-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
-                <Trash2 size={26} className="text-red-600" />
+              <div className="w-14 h-14 rounded-full bg-error-container flex items-center justify-center">
+                <Trash2 size={26} className="text-error" />
               </div>
               <div>
                 <h3 className="font-sans text-[20px] font-bold text-on-surface">Eliminar Pasillo</h3>
@@ -562,7 +562,7 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDe
                 </button>
                 <button
                   onClick={() => { onDeleteAisle(aisleToDelete.id); setAisleToDelete(null); }}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all"
+                  className="flex-1 bg-error hover:bg-error/90 text-on-error font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all"
                 >
                   Eliminar
                 </button>

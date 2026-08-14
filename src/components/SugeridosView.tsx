@@ -6,6 +6,7 @@ import { db, isFirebaseConfigured } from '../firebase';
 import { collection, doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { useToast } from './Toast';
 import { BarcodeScanner } from './BarcodeScanner';
+import { LoadingIndicator } from './ui/LoadingIndicator';
 
 interface SugeridosViewProps {
   onNavigate: (view: ViewState, aisleNum?: number) => void;
@@ -668,8 +669,8 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
         <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
         {isOffline && (
           <div className="offline-banner w-full py-1.5 flex justify-center items-center gap-2 shadow-sm rounded-lg mb-4 animate-in fade-in slide-in-from-top-2">
-            <CloudOff size={14} className="text-[#745815]" />
-            <span className="font-mono text-[13px] font-medium text-[#745815]">Modo offline activo</span>
+            <CloudOff size={14} className="text-on-tertiary-fixed-variant" />
+            <span className="font-mono text-[13px] font-medium text-on-tertiary-fixed-variant">Modo offline activo</span>
           </div>
         )}
 
@@ -719,9 +720,8 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
             </div>
 
             {loadingAllProducts && globalSearchResults.length === 0 ? (
-              <div className="flex items-center justify-center gap-2 py-8 text-on-surface-variant font-mono text-[14px]">
-                <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                Cargando base de datos...
+              <div className="flex items-center justify-center py-8">
+                <LoadingIndicator label="Cargando base de datos..." />
               </div>
             ) : globalSearchResults.length === 0 ? (
               <div className="text-center py-8 text-on-surface-variant font-sans text-[15px]">
@@ -740,7 +740,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
                     </div>
                     <div className="flex-grow min-w-0">
                       <h4 className="font-sans text-[15px] font-semibold text-on-surface truncate">{product.name}</h4>
-                      <p className="font-mono text-[12px] text-[#4f6b53] truncate">
+                      <p className="font-mono text-[12px] text-on-surface-variant truncate">
                         {product.brand} • SKU: {product.sku || 'N/A'} • {aisle.name}
                       </p>
                     </div>
@@ -808,7 +808,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
           <div className="fixed bottom-[80px] md:bottom-6 left-0 md:left-64 right-0 px-4 pt-8 pb-4 bg-gradient-to-t from-[var(--color-background)] via-[var(--color-background)] to-transparent pointer-events-none z-40 flex justify-center gap-3 transform-gpu">
             <button 
               onClick={handleDiscardDraft}
-              className="px-6 py-4 bg-white border border-outline-variant text-[#ba1a1a] hover:bg-red-50/50 rounded-full shadow-md flex items-center justify-center gap-2 hover:scale-[0.98] active:scale-95 transition-all pointer-events-auto cursor-pointer font-sans text-[16px] font-semibold"
+              className="px-6 py-4 bg-white border border-outline-variant text-error hover:bg-error-container/40 rounded-full shadow-md flex items-center justify-center gap-2 hover:scale-[0.98] active:scale-95 transition-all pointer-events-auto cursor-pointer font-sans text-[16px] font-semibold"
               title="Descartar borrador"
             >
               <Trash2 size={20} />
@@ -842,8 +842,8 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
       <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24 md:pb-8">
       {isOffline && (
         <div className="offline-banner w-full py-1.5 flex justify-center items-center gap-2 shadow-sm rounded-lg mb-4 animate-in fade-in slide-in-from-top-2">
-          <CloudOff size={14} className="text-[#745815]" />
-          <span className="font-mono text-[13px] font-medium text-[#745815]">Modo offline activo</span>
+          <CloudOff size={14} className="text-on-tertiary-fixed-variant" />
+          <span className="font-mono text-[13px] font-medium text-on-tertiary-fixed-variant">Modo offline activo</span>
         </div>
       )}
 
@@ -964,53 +964,54 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
                     )}
                   </div>
 
-                  <div className="flex flex-col justify-center overflow-hidden pr-2">
-                    <h3 className="font-sans text-[16px] font-semibold text-[#281C19] leading-snug">{product.name}</h3>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-mono text-[13px] text-[#4f6b53]">
-                        {product.brand} • SKU: {product.sku || 'N/A'} • Caja: {product.und_x_caja ?? 0} und{product.company ? ` • Empresa: ${product.company}` : ''}{product.sellingUnit === 'kg' ? ' • Venta: Kg' : ''}
-                      </span>
+                  <div className="flex flex-col justify-center overflow-hidden pr-2 min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <h3 className="font-sans text-[16px] font-semibold text-on-surface leading-snug truncate min-w-0">{product.name}</h3>
                       {(user?.role === 'operador' || user?.role === 'admin') && (
                         <button
                           onClick={() => {
                             handleStartEditProduct(product);
                             fetchAllProducts(); // Carga las empresas en segundo plano
                           }}
-                          className="text-primary hover:text-primary/70 transition-colors p-0.5 inline-flex items-center gap-0.5 cursor-pointer"
+                          className="text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors p-1.5 rounded-lg inline-flex items-center justify-center flex-shrink-0 cursor-pointer"
                           title="Editar producto"
                         >
-                          <Pencil size={12} />
+                          <Pencil size={13} />
                         </button>
                       )}
                     </div>
-                    
-                    <div className="flex gap-1.5 mt-2">
-                      <button 
+                    <span className="font-mono text-[12px] text-on-surface-variant truncate block">
+                      {product.brand} • SKU: {product.sku || 'N/A'} • Caja: {product.und_x_caja ?? 0} und{product.company ? ` • ${product.company}` : ''}{product.sellingUnit === 'kg' ? ' • Venta: Kg' : ''}
+                    </span>
+
+                    {/* Status: primary action for this row — segmented pill group */}
+                    <div className="flex mt-2.5 bg-white rounded-full p-1 border border-outline-variant/30 w-fit">
+                      <button
                         onClick={() => updateProductStatus(product.id, 'normal')}
-                        className={`px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider cursor-pointer transition-all ${
-                          product.status === 'normal' 
-                            ? 'border-primary bg-primary/10 text-primary font-bold' 
-                            : 'border-outline-variant/30 text-on-surface-variant/70 hover:bg-surface-variant/50'
+                        className={`px-3 py-1.5 rounded-full text-[11px] font-mono font-bold uppercase tracking-wide cursor-pointer transition-all ${
+                          product.status === 'normal'
+                            ? 'bg-primary/15 text-primary'
+                            : 'text-on-surface-variant/60 hover:text-on-surface'
                         }`}
                       >
                         Normal
                       </button>
-                      <button 
+                      <button
                         onClick={() => updateProductStatus(product.id, 'bajo')}
-                        className={`px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider cursor-pointer transition-all ${
-                          product.status === 'bajo' 
-                            ? 'border-amber-500 bg-amber-500/10 text-amber-700 font-bold' 
-                            : 'border-outline-variant/30 text-on-surface-variant/70 hover:bg-surface-variant/50'
+                        className={`px-3 py-1.5 rounded-full text-[11px] font-mono font-bold uppercase tracking-wide cursor-pointer transition-all ${
+                          product.status === 'bajo'
+                            ? 'bg-tertiary-container/50 text-on-tertiary-fixed-variant'
+                            : 'text-on-surface-variant/60 hover:text-on-surface'
                         }`}
                       >
                         Bajo
                       </button>
-                      <button 
+                      <button
                         onClick={() => updateProductStatus(product.id, 'crítico')}
-                        className={`px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider cursor-pointer transition-all ${
-                          product.status === 'crítico' 
-                            ? 'border-error bg-error/10 text-error font-bold animate-pulse' 
-                            : 'border-outline-variant/30 text-on-surface-variant/70 hover:bg-surface-variant/50'
+                        className={`px-3 py-1.5 rounded-full text-[11px] font-mono font-bold uppercase tracking-wide cursor-pointer transition-all ${
+                          product.status === 'crítico'
+                            ? 'bg-error-container text-on-error-container animate-pulse'
+                            : 'text-on-surface-variant/60 hover:text-on-surface'
                         }`}
                       >
                         Crítico
@@ -1089,7 +1090,7 @@ export function SugeridosView({ onNavigate, onAddOrders, aisles, user }: Sugerid
         <div className="fixed bottom-[80px] md:bottom-6 left-0 md:left-64 right-0 px-4 pt-8 pb-4 bg-gradient-to-t from-[var(--color-background)] via-[var(--color-background)] to-transparent pointer-events-none z-40 flex justify-center gap-3 transform-gpu">
           <button 
             onClick={handleDiscardDraft}
-            className="px-6 py-4 bg-white border border-outline-variant text-[#ba1a1a] hover:bg-red-50/50 rounded-full shadow-md flex items-center justify-center gap-2 hover:scale-[0.98] active:scale-95 transition-all pointer-events-auto cursor-pointer font-sans text-[16px] font-semibold"
+            className="px-6 py-4 bg-white border border-outline-variant text-error hover:bg-error-container/40 rounded-full shadow-md flex items-center justify-center gap-2 hover:scale-[0.98] active:scale-95 transition-all pointer-events-auto cursor-pointer font-sans text-[16px] font-semibold"
             title="Descartar borrador"
           >
             <Trash2 size={20} />

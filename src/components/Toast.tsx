@@ -84,8 +84,8 @@ function ToastCard({ toast, onClose }: { toast: ToastMessage; onClose: () => voi
         };
       case 'warning':
         return {
-          bg: 'bg-white/95 border-l-4 border-l-offline-banner',
-          icon: <AlertTriangle className="text-amber-600 flex-shrink-0" size={20} />,
+          bg: 'bg-white/95 border-l-4 border-l-tertiary',
+          icon: <AlertTriangle className="text-tertiary flex-shrink-0" size={20} />,
           text: 'text-on-surface',
         };
       case 'info':

@@ -37,6 +37,11 @@ export function PanelView({ onNavigate, aisles, orders, checkedOrders }: PanelVi
     .sort((a, b) => b.confirmed - a.confirmed || b.total - a.total)
     .slice(0, 5);
 
+  // Aisles with a pending (unchecked) crítico order get flagged for the "Estado de Pasillos" grid
+  const criticalAisles = new Set(
+    orders.filter(o => o.status === 'crítico' && !checkedOrders.has(o.id)).map(o => o.aisle)
+  );
+
   return (
     <div className="w-full h-full mx-auto pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <header className="mb-6 sm:mb-8">
@@ -45,7 +50,7 @@ export function PanelView({ onNavigate, aisles, orders, checkedOrders }: PanelVi
       </header>
 
       {/* Top Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 mb-8 sm:mb-10">
+      <div className="grid grid-cols-2 gap-3 sm:gap-5 mb-3 sm:mb-5">
 
         {/* Card 1: Sugeridos Activos */}
         <div className="bg-card-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-[0_4px_20px_rgba(40,28,25,0.05)] flex flex-col justify-between min-h-[130px] sm:min-h-[160px] relative overflow-hidden group cursor-pointer" onClick={() => onNavigate('compras')}>
@@ -98,61 +103,56 @@ export function PanelView({ onNavigate, aisles, orders, checkedOrders }: PanelVi
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Card 3: Productos que más rotan */}
-        <div className="col-span-2 lg:col-span-1 bg-card-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-[0_4px_20px_rgba(40,28,25,0.05)] flex flex-col min-h-[130px] sm:min-h-[160px] relative overflow-hidden group">
-          <div className="absolute -right-4 -bottom-4 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity pointer-events-none">
-            <Repeat2 size={100} className="sm:hidden" />
-            <Repeat2 size={140} className="hidden sm:block" />
-          </div>
-          <div className="flex justify-between items-start relative z-10 mb-3 sm:mb-4">
-            <span className="font-mono text-[10.5px] sm:text-[13px] opacity-70 uppercase tracking-wider">Alta Rotación</span>
-            <div className="bg-primary-container text-on-primary-container rounded-full p-1.5 sm:p-2 flex-shrink-0">
-              <Repeat2 size={16} className="sm:hidden" />
-              <Repeat2 size={20} className="hidden sm:block" />
-            </div>
-          </div>
-
-          <div className="relative z-10 flex-1 flex flex-col justify-center">
-            {topProducts.length === 0 ? (
-              <p className="font-sans text-[13px] sm:text-[14px] text-on-surface-variant">Aún no hay suficientes datos de sugeridos.</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {topProducts.map((p, i) => (
-                  <div key={i} className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <span className={`font-mono text-[11px] font-bold w-5 flex-shrink-0 ${i === 0 ? 'text-primary' : 'text-on-surface-variant/60'}`}>
-                        #{i + 1}
-                      </span>
-                      <span className="font-sans text-[13px] font-semibold text-on-surface truncate">{p.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {p.confirmed > 0 && (
-                        <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-primary/10 text-primary rounded-full font-mono text-[10px] font-bold border border-primary/20">
-                          <CheckCircle2 size={10} />
-                          {p.confirmed}
-                        </span>
-                      )}
-                      <span className="font-mono text-[11px] text-on-surface-variant">{p.total}x</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+      {/* Card 3: Productos que más rotan — full-width row, own breathing room */}
+      <div className="bg-card-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-[0_4px_20px_rgba(40,28,25,0.05)] relative overflow-hidden group mb-8 sm:mb-10">
+        <div className="flex justify-between items-start mb-4 sm:mb-5">
+          <span className="font-mono text-[10.5px] sm:text-[13px] opacity-70 uppercase tracking-wider">Alta Rotación</span>
+          <div className="bg-primary-container text-on-primary-container rounded-full p-1.5 sm:p-2 flex-shrink-0">
+            <Repeat2 size={16} className="sm:hidden" />
+            <Repeat2 size={20} className="hidden sm:block" />
           </div>
         </div>
+
+        {topProducts.length === 0 ? (
+          <p className="font-sans text-[13px] sm:text-[14px] text-on-surface-variant">Aún no hay suficientes datos de sugeridos.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5">
+            {topProducts.map((p, i) => (
+              <div key={i} className="min-w-0">
+                <span className={`font-mono text-[11px] font-bold ${i === 0 ? 'text-primary' : 'text-on-surface-variant/60'}`}>
+                  #{i + 1}
+                </span>
+                <div className="font-sans text-[13.5px] font-semibold text-on-surface truncate mt-1">{p.name}</div>
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  {p.confirmed > 0 && (
+                    <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-primary/10 text-primary rounded-full font-mono text-[10px] font-bold border border-primary/20">
+                      <CheckCircle2 size={10} />
+                      {p.confirmed}
+                    </span>
+                  )}
+                  <span className="font-mono text-[11px] text-on-surface-variant">{p.total}x</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Aisles Grid */}
       <div>
-        <div className="flex justify-between items-center mb-3 sm:mb-4">
+        <div className="flex justify-between items-center mb-3 sm:mb-4 flex-wrap gap-y-2">
           <h3 className="font-sans text-[17px] sm:text-[20px] font-semibold text-on-surface">Estado de Pasillos</h3>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 rounded-full bg-surface-variant/50 font-mono text-[10.5px] sm:text-[13px]">
               <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div> <span className="sm:hidden">Con stock</span><span className="hidden sm:inline">Con productos</span>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 rounded-full bg-surface-variant/50 font-mono text-[10.5px] sm:text-[13px]">
-              <div className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0"></div> Vacío
+              <div className="w-2 h-2 rounded-full bg-tertiary flex-shrink-0"></div> Vacío
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 rounded-full bg-surface-variant/50 font-mono text-[10.5px] sm:text-[13px]">
+              <div className="w-2 h-2 rounded-full bg-error flex-shrink-0"></div> Crítico
             </div>
           </div>
         </div>
@@ -160,9 +160,11 @@ export function PanelView({ onNavigate, aisles, orders, checkedOrders }: PanelVi
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-5">
           {aisles.map((aisle) => {
             const hasProducts = (aisle.productsCount || 0) > 0;
-            const color = hasProducts ? 'bg-primary' : 'bg-amber-500';
-            const textColor = hasProducts ? 'text-primary' : 'text-amber-600';
-            const bgLight = hasProducts ? 'bg-primary/10' : 'bg-amber-100';
+            const isCritical = criticalAisles.has(aisle.number);
+            const color = isCritical ? 'bg-error' : hasProducts ? 'bg-primary' : 'bg-tertiary';
+            const textColor = isCritical ? 'text-error' : hasProducts ? 'text-primary' : 'text-on-tertiary-fixed-variant';
+            const bgLight = isCritical ? 'bg-error-container' : hasProducts ? 'bg-primary/10' : 'bg-tertiary-container/40';
+            const badgeLabel = isCritical ? 'Crítico' : hasProducts ? 'Con stock' : 'Vacío';
             return (
               <div
                 key={aisle.id}
@@ -190,7 +192,7 @@ export function PanelView({ onNavigate, aisles, orders, checkedOrders }: PanelVi
                     </div>
                   </div>
                   <div className={`${bgLight} ${textColor} self-start sm:self-auto px-2 sm:px-3 py-0.5 sm:py-1 rounded-full font-mono text-[10.5px] sm:text-[13px] font-medium`}>
-                    {hasProducts ? 'Con stock' : 'Vacío'}
+                    {badgeLabel}
                   </div>
                 </div>
               </div>

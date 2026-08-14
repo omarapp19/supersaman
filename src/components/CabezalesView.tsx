@@ -4,6 +4,7 @@ import { Aisle, Cabezal, CabezalPago, PaymentType, DiagramElement } from '../typ
 import { db, isFirebaseConfigured } from '../firebase';
 import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { useToast } from './Toast';
+import { RowActionButton } from './ui/RowActionButton';
 
 function loadLocalElements(): DiagramElement[] {
   try {
@@ -61,13 +62,12 @@ function isPaidForCurrentPeriod(cabezal: Cabezal): boolean {
   return cabezal.lastPaidPeriod === getBillingPeriodLabel();
 }
 
-// Every diagram box shares the same fixed footprint; scale the font down for longer
-// labels instead of truncating so the full name still fits inside it.
+// Every diagram box shares the same fixed footprint. Font size only shrinks a little for
+// longer labels — below 10px it stops being legible, so longer names truncate instead
+// (see the `line-clamp-2` + `title` attribute on the label itself).
 function getDiagramLabelSizeClass(label: string): string {
-  if (label.length <= 10) return 'text-[9.5px]';
-  if (label.length <= 18) return 'text-[8.5px]';
-  if (label.length <= 28) return 'text-[7.5px]';
-  return 'text-[6.5px]';
+  if (label.length <= 12) return 'text-[10px]';
+  return 'text-[10px] leading-[1.05]';
 }
 
 function loadLocalPagos(cabezalId: string): CabezalPago[] {
@@ -189,13 +189,13 @@ export function CabezalesView({ cabezales, aisles, onAddCabezal, onUpdateCabezal
         <div className="flex gap-1 mb-6 bg-surface-variant/30 p-1 rounded-full w-fit">
           <button
             onClick={() => setActiveTab('lista')}
-            className={`px-5 py-2 rounded-full font-sans text-[14px] font-semibold transition-all cursor-pointer ${activeTab === 'lista' ? 'bg-white shadow-sm text-primary' : 'text-on-surface-variant'}`}
+            className={`px-5 py-2 rounded-full font-sans text-[14px] font-semibold transition-all cursor-pointer ${activeTab === 'lista' ? 'bg-primary text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
           >
             Lista
           </button>
           <button
             onClick={() => setActiveTab('diagrama')}
-            className={`px-5 py-2 rounded-full font-sans text-[14px] font-semibold transition-all cursor-pointer ${activeTab === 'diagrama' ? 'bg-white shadow-sm text-primary' : 'text-on-surface-variant'}`}
+            className={`px-5 py-2 rounded-full font-sans text-[14px] font-semibold transition-all cursor-pointer ${activeTab === 'diagrama' ? 'bg-primary text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
           >
             Diagrama
           </button>
@@ -304,19 +304,15 @@ function CabezalCard({ cabezal, aisles, onClick, onDelete }: {
       onClick={onClick}
       className="bg-card-surface rounded-3xl p-6 shadow-[0_4px_20px_rgba(40,28,25,0.05)] hover:-translate-y-1 transition-transform cursor-pointer border border-transparent hover:border-outline-variant/50 relative overflow-hidden group"
     >
-      <div className={`absolute top-0 left-0 w-full h-1 ${isRented ? (expired ? 'bg-red-500' : 'bg-primary') : 'bg-amber-500'}`}></div>
+      <div className={`absolute top-0 left-0 w-full h-1 ${isRented ? (expired ? 'bg-error' : 'bg-primary') : 'bg-tertiary'}`}></div>
       <div className="flex justify-between items-start mb-3">
         <div className="min-w-0">
           <h3 className="font-sans text-[18px] font-bold text-on-surface truncate">{cabezal.label}</h3>
           {linkedAisle && <span className="font-mono text-[12px] text-on-surface-variant truncate block">{linkedAisle.name}</span>}
         </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-red-100 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer flex-shrink-0"
-          title="Eliminar cabezal"
-        >
-          <Trash2 size={15} />
-        </button>
+        <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
+          <RowActionButton icon={Trash2} size="sm" variant="danger" label="Eliminar cabezal" onClick={onDelete} />
+        </div>
       </div>
 
       <div className="flex items-center gap-2 mb-3">
@@ -330,10 +326,10 @@ function CabezalCard({ cabezal, aisles, onClick, onDelete }: {
         </span>
         {isRented && (
           <>
-            <span className={`px-2.5 py-1 rounded-full font-mono text-[10.5px] font-bold uppercase ${expired ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20'}`}>
+            <span className={`px-2.5 py-1 rounded-full font-mono text-[10.5px] font-bold uppercase ${expired ? 'bg-error-container text-on-error-container border border-error/20' : 'bg-primary/10 text-primary border border-primary/20'}`}>
               {expired ? 'Vencido' : 'Vigente'}
             </span>
-            <span className={`px-2.5 py-1 rounded-full font-mono text-[10.5px] font-bold uppercase ${paidThisPeriod ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}>
+            <span className={`px-2.5 py-1 rounded-full font-mono text-[10.5px] font-bold uppercase ${paidThisPeriod ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-tertiary-container/40 text-on-tertiary-fixed-variant border border-tertiary-fixed-dim/60'}`}>
               {paidThisPeriod ? 'Pagado' : 'En Deuda'}
             </span>
           </>
@@ -532,10 +528,10 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
             </span>
             {tenantCompany && (
               <>
-                <span className={`px-2.5 py-1 rounded-full font-mono text-[11px] font-bold uppercase ${expired ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20'}`}>
+                <span className={`px-2.5 py-1 rounded-full font-mono text-[11px] font-bold uppercase ${expired ? 'bg-error-container text-on-error-container border border-error/20' : 'bg-primary/10 text-primary border border-primary/20'}`}>
                   {expired ? 'Vencido' : 'Vigente'}
                 </span>
-                <span className={`px-2.5 py-1 rounded-full font-mono text-[11px] font-bold uppercase ${paidThisPeriod ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}>
+                <span className={`px-2.5 py-1 rounded-full font-mono text-[11px] font-bold uppercase ${paidThisPeriod ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-tertiary-container/40 text-on-tertiary-fixed-variant border border-tertiary-fixed-dim/60'}`}>
                   {paidThisPeriod ? 'Pagado' : 'En Deuda'}
                 </span>
               </>
@@ -663,7 +659,7 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
                 pagos.map(p => (
                   <div key={p.id} className="flex justify-between items-center text-[12px] font-mono border-b border-outline-variant/10 pb-1.5 last:border-0">
                     <span className="text-on-surface">{p.periodStart} → {p.periodEnd}</span>
-                    <span className={p.isPaid ? 'text-emerald-700' : 'text-amber-700'}>{p.isPaid ? 'Pagado' : 'Pendiente'}</span>
+                    <span className={p.isPaid ? 'text-primary' : 'text-on-tertiary-fixed-variant'}>{p.isPaid ? 'Pagado' : 'Pendiente'}</span>
                   </div>
                 ))
               )}
@@ -674,7 +670,7 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
             <button
               type="button"
               onClick={onDelete}
-              className="px-4 py-3.5 rounded-full border border-error/30 text-[#ba1a1a] hover:bg-error/5 font-sans text-[14px] font-semibold transition-all cursor-pointer"
+              className="px-4 py-3.5 rounded-full border border-error/30 text-error hover:bg-error/5 font-sans text-[14px] font-semibold transition-all cursor-pointer"
               title="Eliminar cabezal"
             >
               <Trash2 size={16} />
@@ -694,8 +690,8 @@ function ConfirmDeleteModal({ cabezal, onCancel, onConfirm }: { cabezal: Cabezal
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onCancel}>
       <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
         <div className="p-6 flex flex-col items-center text-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
-            <Trash2 size={26} className="text-red-600" />
+          <div className="w-14 h-14 rounded-full bg-error-container flex items-center justify-center">
+            <Trash2 size={26} className="text-error" />
           </div>
           <div>
             <h3 className="font-sans text-[20px] font-bold text-on-surface">Eliminar Cabezal</h3>
@@ -707,7 +703,7 @@ function ConfirmDeleteModal({ cabezal, onCancel, onConfirm }: { cabezal: Cabezal
             <button onClick={onCancel} className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer">
               Cancelar
             </button>
-            <button onClick={onConfirm} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer">
+            <button onClick={onConfirm} className="flex-1 bg-error hover:bg-error/90 text-on-error font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer">
               Eliminar
             </button>
           </div>
@@ -1072,13 +1068,13 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
               {activeGuideX !== null && (
                 <div
                   style={{ left: `${activeGuideX}%` }}
-                  className="absolute top-0 bottom-0 w-[1.5px] border-l border-dashed border-red-500 pointer-events-none z-20"
+                  className="absolute top-0 bottom-0 w-[1.5px] border-l border-dashed border-error pointer-events-none z-20"
                 />
               )}
               {activeGuideY !== null && (
                 <div
                   style={{ top: `${activeGuideY}%` }}
-                  className="absolute left-0 right-0 h-[1.5px] border-t border-dashed border-red-500 pointer-events-none z-20"
+                  className="absolute left-0 right-0 h-[1.5px] border-t border-dashed border-error pointer-events-none z-20"
                 />
               )}
 
@@ -1127,19 +1123,19 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
                           onPointerDown={(e) => e.stopPropagation()}
                           onClick={(e) => { e.stopPropagation(); onUpdateElement(el.id, { rotation: (el.rotation + 90) % 180 }); }}
                           style={{ transform: `rotate(${-el.rotation}deg)` }}
-                          className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-white border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:text-primary shadow-sm cursor-pointer"
+                          className="absolute -top-3.5 -right-3.5 w-7 h-7 rounded-full bg-white border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:text-primary shadow-sm cursor-pointer"
                           title="Rotar estante"
                         >
-                          <RotateCw size={11} />
+                          <RotateCw size={13} />
                         </button>
                         <button
                           onPointerDown={(e) => e.stopPropagation()}
                           onClick={(e) => { e.stopPropagation(); onDeleteElement(el.id); setSelectedElementId(null); }}
                           style={{ transform: `rotate(${-el.rotation}deg)` }}
-                          className="absolute -top-2.5 -left-2.5 w-5 h-5 rounded-full bg-white border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:text-error shadow-sm cursor-pointer"
+                          className="absolute -top-3.5 -left-3.5 w-7 h-7 rounded-full bg-white border border-outline-variant/50 flex items-center justify-center text-on-surface-variant hover:text-error shadow-sm cursor-pointer"
                           title="Eliminar estante"
                         >
-                          <X size={11} />
+                          <X size={13} />
                         </button>
                       </>
                     )}
@@ -1168,6 +1164,7 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
                 return (
                   <button
                     key={cab.id}
+                    title={cab.label}
                     onPointerDown={(e) => handlePointerDown(e, 'cabezal', cab.id, cab.positionX ?? 50, cab.positionY ?? 50)}
                     onPointerUp={handlePointerUp}
                     style={{ left: `${x}%`, top: `${y}%` }}
@@ -1175,7 +1172,7 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
                       isRented ? 'bg-primary/10 border-primary text-primary' : 'bg-white border-outline-variant/50 text-on-surface-variant'
                     } ${isAllSelected ? 'ring-2 ring-primary border-primary bg-primary/10' : ''}`}
                   >
-                    <span className={`w-full leading-tight break-words ${getDiagramLabelSizeClass(cab.label)}`}>{cab.label}</span>
+                    <span className={`w-full leading-tight line-clamp-2 ${getDiagramLabelSizeClass(cab.label)}`}>{cab.label}</span>
                     <span className="w-full font-mono text-[7px] font-normal opacity-70 leading-none truncate mt-0.5">{isRented ? cab.tenantCompany : 'Vacante'}</span>
                   </button>
                 );

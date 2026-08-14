@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Printer, ChevronDown, X, Store, CheckCircle2, Circle, CalendarDays, Package, ArrowUp, Pencil } from 'lucide-react';
+import { Search, Printer, ChevronDown, X, Store, CalendarDays, Package, ArrowUp, Pencil, SlidersHorizontal } from 'lucide-react';
 import { ViewState, OrderItem, Aisle } from '../types';
 import { isFirebaseConfigured } from '../firebase';
 import { mockProductsByAisle } from '../data';
 import { getDayKey, getStartOfWeekDate, getWeekKey, formatWeekLabel } from '../utils/dateGrouping';
+import { SelectCheckbox } from './ui/SelectCheckbox';
 
 interface ComprasViewProps {
   orders: OrderItem[];
@@ -66,6 +67,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
   const [selectedOperatorFilter, setSelectedOperatorFilter] = useState<string | null>(null);
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string | null>(null);
   const [selectedCheckedFilter, setSelectedCheckedFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [showFilters, setShowFilters] = useState(false);
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printGroupBy, setPrintGroupBy] = useState<'aisle' | 'day' | 'week' | 'operator'>('aisle');
@@ -417,7 +419,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64">
+            <div className="relative flex-1 md:w-56">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/70" size={18} />
               <input
                 type="text"
@@ -437,160 +439,181 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
           </div>
         </div>
 
-        {/* Filter bar */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6 items-stretch md:items-end">
-          {/* Pasillo Selector */}
-          <div className="flex-grow flex-shrink min-w-[150px]">
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
-              Pasillo
-            </label>
-            <div className="relative">
-              <select
-                value={selectedAisleFilter !== null ? selectedAisleFilter : ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedAisleFilter(val === '' ? null : Number(val));
-                }}
-                className="w-full bg-white border border-outline-variant/30 text-on-surface rounded-2xl py-2.5 pl-4 pr-10 font-sans text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer appearance-none"
-              >
-                <option value="">Todos los Pasillos</option>
-                {aisles
-                  .filter(aisle => !isOperator || user?.assignedAisles?.includes(aisle.number))
-                  .map(aisle => (
-                    <option key={aisle.id} value={aisle.number}>
-                      Pasillo {aisle.number} - {aisle.name}
-                    </option>
+        {/* Filter toolbar: order-status switch + a single "Filtros" toggle instead of 4 loose selects */}
+        {(() => {
+          const activeFilterCount = [selectedAisleFilter, selectedStatusFilter, selectedOperatorFilter, selectedCompanyFilter].filter(v => v !== null).length;
+          return (
+            <>
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <div className="flex bg-white border border-outline-variant/30 rounded-2xl p-1 shadow-sm h-[42px] items-center">
+                  {[
+                    { val: 'all', label: 'Todos' },
+                    { val: 'pending', label: 'Pendientes' },
+                    { val: 'completed', label: 'Pedidos' }
+                  ].map(opt => (
+                    <button
+                      key={opt.val}
+                      type="button"
+                      onClick={() => setSelectedCheckedFilter(opt.val as any)}
+                      className={`h-full px-4 rounded-xl font-sans text-[13px] font-semibold transition-all cursor-pointer text-center flex items-center justify-center ${
+                        selectedCheckedFilter === opt.val
+                          ? 'bg-primary text-white shadow-sm'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
                   ))}
-              </select>
-              <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" size={16} />
-            </div>
-          </div>
+                </div>
 
-          {/* Estado Selector */}
-          <div className="flex-grow flex-shrink min-w-[150px]">
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
-              Estado de Stock
-            </label>
-            <div className="relative">
-              <select
-                value={selectedStatusFilter !== null ? selectedStatusFilter : ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedStatusFilter(val === '' ? null : val as any);
-                }}
-                className="w-full bg-white border border-outline-variant/30 text-on-surface rounded-2xl py-2.5 pl-4 pr-10 font-sans text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer appearance-none"
-              >
-                <option value="">Todos los Estados</option>
-                <option value="crítico">Crítico</option>
-                <option value="bajo">Bajo</option>
-                <option value="normal">Normal</option>
-              </select>
-              <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" size={16} />
-            </div>
-          </div>
-
-          {/* Operador Selector (only if user is not Operator) */}
-          {!isOperator && (
-            <div className="flex-grow flex-shrink min-w-[150px]">
-              <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
-                Operador
-              </label>
-              <div className="relative">
-                <select
-                  value={selectedOperatorFilter !== null ? selectedOperatorFilter : ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedOperatorFilter(val === '' ? null : val);
-                  }}
-                  className="w-full bg-white border border-outline-variant/30 text-on-surface rounded-2xl py-2.5 pl-4 pr-10 font-sans text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer appearance-none"
-                >
-                  <option value="">Todos los Operadores</option>
-                  {Array.from(new Set(orders.map(o => o.user).filter(Boolean)))
-                    .sort()
-                    .map(op => (
-                      <option key={op} value={op}>
-                        {op}
-                      </option>
-                    ))
-                  }
-                </select>
-                <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" size={16} />
-              </div>
-            </div>
-          )}
-
-          {/* Empresa Selector */}
-          <div className="flex-grow flex-shrink min-w-[150px]">
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
-              Empresa
-            </label>
-            <div className="relative">
-              <select
-                value={selectedCompanyFilter !== null ? selectedCompanyFilter : ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedCompanyFilter(val === '' ? null : val);
-                }}
-                className="w-full bg-white border border-outline-variant/30 text-on-surface rounded-2xl py-2.5 pl-4 pr-10 font-sans text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer appearance-none"
-              >
-                <option value="">Todas las Empresas</option>
-                {Array.from(new Set(orders.map(o => (o as any).company).filter(Boolean)))
-                  .sort()
-                  .map(company => (
-                    <option key={company} value={company}>
-                      {company}
-                    </option>
-                  ))
-                }
-              </select>
-              <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" size={16} />
-            </div>
-          </div>
-
-          {/* Estado del Pedido Selector (Segmented Switch) */}
-          <div className="flex flex-col gap-1.5 min-w-[250px] flex-grow flex-shrink">
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant ml-1 font-bold">
-              Filtrar por Pedido
-            </label>
-            <div className="flex bg-white border border-outline-variant/30 rounded-2xl p-1 shadow-sm h-[46px] items-center">
-              {[
-                { val: 'all', label: 'Todos' },
-                { val: 'pending', label: 'Pendientes' },
-                { val: 'completed', label: 'Pedidos' }
-              ].map(opt => (
                 <button
-                  key={opt.val}
-                  type="button"
-                  onClick={() => setSelectedCheckedFilter(opt.val as any)}
-                  className={`flex-1 h-full rounded-xl font-sans text-[13px] font-semibold transition-all cursor-pointer text-center flex items-center justify-center ${
-                    selectedCheckedFilter === opt.val
-                      ? 'bg-primary text-white shadow-sm'
-                      : 'text-on-surface-variant hover:text-on-surface'
+                  onClick={() => setShowFilters(v => !v)}
+                  className={`flex items-center gap-2 px-4 h-[42px] rounded-2xl font-sans text-[13px] font-semibold transition-all cursor-pointer shadow-sm border ${
+                    showFilters || activeFilterCount > 0
+                      ? 'bg-primary/10 border-primary/30 text-primary'
+                      : 'bg-white border-outline-variant/30 text-on-surface-variant hover:bg-surface-variant/30'
                   }`}
                 >
-                  {opt.label}
+                  <SlidersHorizontal size={16} />
+                  Filtros
+                  {activeFilterCount > 0 && (
+                    <span className="w-[18px] h-[18px] flex items-center justify-center bg-primary text-white rounded-full font-mono text-[10px] font-bold">
+                      {activeFilterCount}
+                    </span>
+                  )}
                 </button>
-              ))}
-            </div>
-          </div>
- 
-          {/* Reset Filters Button */}
-          {(selectedAisleFilter !== null || selectedStatusFilter !== null || selectedOperatorFilter !== null || selectedCompanyFilter !== null || selectedCheckedFilter !== 'all') && (
-            <button
-              onClick={() => {
-                setSelectedAisleFilter(null);
-                setSelectedStatusFilter(null);
-                setSelectedOperatorFilter(null);
-                setSelectedCompanyFilter(null);
-                setSelectedCheckedFilter('all');
-              }}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-error/10 hover:bg-error/20 text-error rounded-2xl font-sans text-[13px] font-semibold transition-all cursor-pointer h-[42px] whitespace-nowrap shadow-sm border border-error/20"
-            >
-              <X size={16} />
-              Limpiar
-            </button>
-          )}
-        </div>
+
+                {(activeFilterCount > 0 || selectedCheckedFilter !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setSelectedAisleFilter(null);
+                      setSelectedStatusFilter(null);
+                      setSelectedOperatorFilter(null);
+                      setSelectedCompanyFilter(null);
+                      setSelectedCheckedFilter('all');
+                    }}
+                    className="flex items-center justify-center gap-2 px-4 h-[42px] bg-error/10 hover:bg-error/20 text-error rounded-2xl font-sans text-[13px] font-semibold transition-all cursor-pointer whitespace-nowrap shadow-sm border border-error/20"
+                  >
+                    <X size={16} />
+                    Limpiar
+                  </button>
+                )}
+              </div>
+
+              {showFilters && (
+                <div className="bg-card-surface rounded-2xl p-4 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                  {/* Pasillo Selector */}
+                  <div>
+                    <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
+                      Pasillo
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedAisleFilter !== null ? selectedAisleFilter : ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSelectedAisleFilter(val === '' ? null : Number(val));
+                        }}
+                        className="w-full bg-white border border-outline-variant/30 text-on-surface rounded-2xl py-2.5 pl-4 pr-10 font-sans text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer appearance-none"
+                      >
+                        <option value="">Todos los Pasillos</option>
+                        {aisles
+                          .filter(aisle => !isOperator || user?.assignedAisles?.includes(aisle.number))
+                          .map(aisle => (
+                            <option key={aisle.id} value={aisle.number}>
+                              Pasillo {aisle.number} - {aisle.name}
+                            </option>
+                          ))}
+                      </select>
+                      <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" size={16} />
+                    </div>
+                  </div>
+
+                  {/* Estado Selector */}
+                  <div>
+                    <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
+                      Estado de Stock
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedStatusFilter !== null ? selectedStatusFilter : ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSelectedStatusFilter(val === '' ? null : val as any);
+                        }}
+                        className="w-full bg-white border border-outline-variant/30 text-on-surface rounded-2xl py-2.5 pl-4 pr-10 font-sans text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer appearance-none"
+                      >
+                        <option value="">Todos los Estados</option>
+                        <option value="crítico">Crítico</option>
+                        <option value="bajo">Bajo</option>
+                        <option value="normal">Normal</option>
+                      </select>
+                      <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" size={16} />
+                    </div>
+                  </div>
+
+                  {/* Operador Selector (only if user is not Operator) */}
+                  {!isOperator && (
+                    <div>
+                      <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
+                        Operador
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={selectedOperatorFilter !== null ? selectedOperatorFilter : ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSelectedOperatorFilter(val === '' ? null : val);
+                          }}
+                          className="w-full bg-white border border-outline-variant/30 text-on-surface rounded-2xl py-2.5 pl-4 pr-10 font-sans text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer appearance-none"
+                        >
+                          <option value="">Todos los Operadores</option>
+                          {Array.from(new Set(orders.map(o => o.user).filter(Boolean)))
+                            .sort()
+                            .map(op => (
+                              <option key={op} value={op}>
+                                {op}
+                              </option>
+                            ))
+                          }
+                        </select>
+                        <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" size={16} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empresa Selector */}
+                  <div>
+                    <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
+                      Empresa
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedCompanyFilter !== null ? selectedCompanyFilter : ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSelectedCompanyFilter(val === '' ? null : val);
+                        }}
+                        className="w-full bg-white border border-outline-variant/30 text-on-surface rounded-2xl py-2.5 pl-4 pr-10 font-sans text-[14px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm cursor-pointer appearance-none"
+                      >
+                        <option value="">Todas las Empresas</option>
+                        {Array.from(new Set(orders.map(o => (o as any).company).filter(Boolean)))
+                          .sort()
+                          .map(company => (
+                            <option key={company} value={company}>
+                              {company}
+                            </option>
+                          ))
+                        }
+                      </select>
+                      <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" size={16} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* Empty state */}
         {grouped.length === 0 && (
@@ -662,27 +685,15 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                         >
                           {/* Check button */}
                           {isOperator ? (
-                            <div className={`flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full mr-1 ${
-                              isChecked ? 'text-primary bg-primary/10' : 'text-on-surface-variant/40 bg-surface-variant/30'
-                            }`}>
-                              {isChecked ? (
-                                <CheckCircle2 size={18} strokeWidth={2.5} />
-                              ) : (
-                                <Circle size={18} strokeWidth={2} className="opacity-60" />
-                              )}
+                            <div className="flex-shrink-0 pointer-events-none">
+                              <SelectCheckbox checked={isChecked} onChange={() => {}} label="Estado del pedido" />
                             </div>
                           ) : (
-                            <button
-                              onClick={() => toggleChecked(order.id)}
-                              title={isChecked ? 'Marcar como pendiente' : 'Marcar como pedido'}
-                              className={`flex-shrink-0 transition-colors rounded-full cursor-pointer ${
-                                isChecked ? 'text-primary' : 'text-outline-variant/50 hover:text-primary'
-                              }`}
-                            >
-                              {isChecked
-                                ? <CheckCircle2 size={22} strokeWidth={2} />
-                                : <Circle size={22} strokeWidth={1.5} />}
-                            </button>
+                            <SelectCheckbox
+                              checked={isChecked}
+                              onChange={() => toggleChecked(order.id)}
+                              label={isChecked ? 'Marcar como pendiente' : 'Marcar como pedido'}
+                            />
                           )}
 
                           {/* Main content area */}
@@ -786,9 +797,9 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                                 {isChecked
                                   ? <span className="inline-flex px-2.5 py-1 bg-primary/10 text-primary rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-primary/20 whitespace-nowrap">Pedido ✓</span>
                                   : <>
-                                    {order.status === 'crítico' && <span className="inline-flex px-2.5 py-1 bg-error/10 text-error rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-error/20 whitespace-nowrap">Crítico</span>}
-                                    {order.status === 'bajo' && <span className="inline-flex px-2.5 py-1 bg-amber-500/10 text-amber-700 rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-amber-500/20 whitespace-nowrap">Bajo</span>}
-                                    {order.status === 'normal' && <span className="inline-flex px-2.5 py-1 bg-secondary-container text-on-secondary-container rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-secondary/20 whitespace-nowrap">Normal</span>}
+                                    {order.status === 'crítico' && <span className="inline-flex px-2.5 py-1 bg-error-container text-on-error-container rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-error/20 whitespace-nowrap">Crítico</span>}
+                                    {order.status === 'bajo' && <span className="inline-flex px-2.5 py-1 bg-tertiary-container/40 text-on-tertiary-fixed-variant rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-tertiary-fixed-dim/60 whitespace-nowrap">Bajo</span>}
+                                    {order.status === 'normal' && <span className="inline-flex px-2.5 py-1 bg-primary/10 text-primary rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-primary/20 whitespace-nowrap">Normal</span>}
                                   </>
                                 }
                                 <span className="font-mono text-[12px] text-on-surface-variant/60 hidden sm:block">
@@ -812,9 +823,12 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
       <div className="hidden print:block w-full text-black font-sans bg-white p-2">
         {/* Header of printed page */}
         <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-end">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight uppercase">Súper Samán</h1>
-            <p className="text-sm text-gray-600 mt-1 uppercase font-mono">Reporte de Fallas y Pedidos de Abastecimiento</p>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-md bg-black text-white flex items-center justify-center font-bold text-sm flex-shrink-0">SS</div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Súper Samán — Sucursal Calle Principal</h1>
+              <p className="text-sm text-gray-600 mt-0.5 uppercase font-mono">Reporte de Fallas y Pedidos de Abastecimiento</p>
+            </div>
           </div>
           <div className="text-right font-mono text-sm">
             <div>Fecha: {new Date().toLocaleDateString('es-VE')}</div>
@@ -892,8 +906,8 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                           <td className="py-3.5 text-sm font-bold text-right border-b border-gray-200">{item.suggestedQty} {item.unit || 'und'}</td>
                           <td className="py-3.5 text-sm font-mono uppercase border-b border-gray-200">
                             <span className={
-                              item.status === 'crítico' ? 'text-red-700 font-bold' :
-                              item.status === 'bajo' ? 'text-amber-700 font-semibold' : 'text-gray-700'
+                              item.status === 'crítico' ? 'text-error font-bold' :
+                              item.status === 'bajo' ? 'text-on-tertiary-fixed-variant font-semibold' : 'text-gray-700'
                             }>
                               {item.status}
                             </span>
@@ -987,7 +1001,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                   <div className="flex flex-col">
                     <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Producto</span>
                     <span className="font-sans text-[18px] font-bold text-on-surface leading-tight mt-0.5">{selectedOrder.productName}</span>
-                    <span className="font-mono text-[13px] text-[#4f6b53] mt-0.5">{selectedOrder.brand}</span>
+                    <span className="font-mono text-[13px] text-on-surface-variant mt-0.5">{selectedOrder.brand}</span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 border-t border-b border-outline-variant/15 py-4 my-2">
@@ -1021,9 +1035,9 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                     <div className="flex flex-col">
                       <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Estado</span>
                       <div className="mt-1">
-                        {selectedOrder.status === 'crítico' && <span className="inline-flex px-3 py-1 bg-error/10 text-error rounded-full font-mono text-[11px] font-bold uppercase tracking-wider border border-error/20">Crítico</span>}
-                        {selectedOrder.status === 'bajo' && <span className="inline-flex px-3 py-1 bg-amber-500/10 text-amber-700 rounded-full font-mono text-[11px] font-bold uppercase tracking-wider border border-amber-500/20">Stock Bajo</span>}
-                        {selectedOrder.status === 'normal' && <span className="inline-flex px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full font-mono text-[11px] font-bold uppercase tracking-wider border border-secondary/20">Normal</span>}
+                        {selectedOrder.status === 'crítico' && <span className="inline-flex px-3 py-1 bg-error-container text-on-error-container rounded-full font-mono text-[11px] font-bold uppercase tracking-wider border border-error/20">Crítico</span>}
+                        {selectedOrder.status === 'bajo' && <span className="inline-flex px-3 py-1 bg-tertiary-container/40 text-on-tertiary-fixed-variant rounded-full font-mono text-[11px] font-bold uppercase tracking-wider border border-tertiary-fixed-dim/60">Stock Bajo</span>}
+                        {selectedOrder.status === 'normal' && <span className="inline-flex px-3 py-1 bg-primary/10 text-primary rounded-full font-mono text-[11px] font-bold uppercase tracking-wider border border-primary/20">Normal</span>}
                       </div>
                     </div>
                     <div className="text-right">
@@ -1122,20 +1136,18 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                     { val: 'critical', label: 'Solo fallas críticas' },
                     { val: 'critical-low', label: 'Fallas críticas y bajas' }
                   ].map(opt => (
-                    <label
+                    <button
                       key={opt.val}
-                      className="flex items-center gap-3 px-3 py-2 bg-white rounded-xl border border-outline-variant/20 hover:bg-surface-variant/10 cursor-pointer transition-colors"
+                      type="button"
+                      onClick={() => setPrintStatusFilter(opt.val as any)}
+                      className={`flex items-center px-3 py-2.5 rounded-xl border font-sans text-[13px] text-left transition-all cursor-pointer ${
+                        printStatusFilter === opt.val
+                          ? 'bg-primary/10 border-primary text-primary font-semibold'
+                          : 'bg-white border-outline-variant/20 text-on-surface hover:bg-surface-variant/10'
+                      }`}
                     >
-                      <input
-                        type="radio"
-                        name="printStatus"
-                        value={opt.val}
-                        checked={printStatusFilter === opt.val}
-                        onChange={() => setPrintStatusFilter(opt.val as any)}
-                        className="w-4.5 h-4.5 text-primary focus:ring-primary/20 accent-primary"
-                      />
-                      <span className="font-sans text-[13px] text-on-surface">{opt.label}</span>
-                    </label>
+                      {opt.label}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -1151,20 +1163,18 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                     { val: 'pending', label: 'Solo pendientes (Sin pedir)' },
                     { val: 'completed', label: 'Solo ordenados/pedidos' }
                   ].map(opt => (
-                    <label
+                    <button
                       key={opt.val}
-                      className="flex items-center gap-3 px-3 py-2 bg-white rounded-xl border border-outline-variant/20 hover:bg-surface-variant/10 cursor-pointer transition-colors"
+                      type="button"
+                      onClick={() => setPrintScope(opt.val as any)}
+                      className={`flex items-center px-3 py-2.5 rounded-xl border font-sans text-[13px] text-left transition-all cursor-pointer ${
+                        printScope === opt.val
+                          ? 'bg-primary/10 border-primary text-primary font-semibold'
+                          : 'bg-white border-outline-variant/20 text-on-surface hover:bg-surface-variant/10'
+                      }`}
                     >
-                      <input
-                        type="radio"
-                        name="printScope"
-                        value={opt.val}
-                        checked={printScope === opt.val}
-                        onChange={() => setPrintScope(opt.val as any)}
-                        className="w-4.5 h-4.5 text-primary focus:ring-primary/20 accent-primary"
-                      />
-                      <span className="font-sans text-[13px] text-on-surface">{opt.label}</span>
-                    </label>
+                      {opt.label}
+                    </button>
                   ))}
                 </div>
               </div>
