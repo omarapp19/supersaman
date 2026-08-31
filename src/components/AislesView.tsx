@@ -396,35 +396,24 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDe
               u.assignedAisles && 
               u.assignedAisles.includes(aisle.number)
             );
-
             return (
               <div 
                 key={aisle.id}
                 onClick={() => onNavigate('pasillo-detail', aisle.number)}
-                className={`text-left rounded-3xl p-6 transition-transform hover:scale-[0.98] shadow-[0_4px_20px_rgba(40,28,25,0.05)] relative overflow-hidden group cursor-pointer ${
-                  isUnassigned ? 'bg-white opacity-80 border border-outline-variant/30' : 'bg-card-surface'
-                }`}
+                className="bg-card-surface border border-outline-variant/30 hover:border-primary/40 text-left rounded-3xl p-5 md:p-6 transition-all hover:scale-[0.99] shadow-[0_4px_20px_rgba(40,28,25,0.05)] relative overflow-hidden group cursor-pointer flex flex-col justify-between min-h-[210px]"
               >
-                <div className="flex justify-between items-start w-full relative z-10">
-                  <div className="flex flex-col gap-1">
-                    <span className="font-mono text-[13px] text-on-surface-variant uppercase tracking-wider">
+                <div className="relative z-10 flex flex-col">
+                  {/* Category & Actions Header */}
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="font-mono text-[11px] md:text-[12px] font-bold text-on-surface-variant uppercase tracking-wider">
                       {aisle.name.toLowerCase().includes('nevera') 
                         ? 'Nevera' 
                         : (aisle.name.toLowerCase().includes('cabezal') || aisle.name.toLowerCase().includes('promoción') || aisle.name.toLowerCase().includes('promociones'))
                           ? 'Cabezales' 
                           : `Pasillo ${aisle.number}`}
                     </span>
-                    <h3 className="font-sans text-[20px] md:text-[24px] text-on-surface font-semibold break-words pr-2">{aisle.name}</h3>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {assignedOperators.length > 0 ? (
-                      <div className="bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-full font-sans text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
-                        <span>Asignado: {assignedOperators.map(o => o.fullName.split(' ')[0]).join(', ')}</span>
-                      </div>
-                    ) : null}
                     {!isOperator && (
-                      <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         <RowActionButton
                           icon={Pencil}
                           size="sm"
@@ -447,18 +436,36 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDe
                       </div>
                     )}
                   </div>
+
+                  {/* Title */}
+                  <h3 className="font-sans text-[18px] md:text-[20px] text-on-surface font-bold leading-tight line-clamp-2 mb-2 min-h-[44px] flex items-center" title={aisle.name}>
+                    {aisle.name}
+                  </h3>
+
+                  {/* Assigned Operator Badge */}
+                  {assignedOperators.length > 0 ? (
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary border border-primary/20 rounded-full font-sans text-[11px] font-bold uppercase tracking-wider max-w-full truncate shadow-sm self-start mb-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse flex-shrink-0"></span>
+                      <span className="truncate">Asignado: {assignedOperators.map(o => o.fullName.split(' ')[0]).join(', ')}</span>
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-surface-variant/40 text-on-surface-variant/70 border border-outline-variant/30 rounded-full font-mono text-[10.5px] font-medium uppercase tracking-wider self-start mb-3">
+                      <span>Sin asignar</span>
+                    </div>
+                  )}
                 </div>
                 
-                <div className="flex items-center gap-6 mt-6 relative z-10">
+                {/* Footer Stats */}
+                <div className="flex items-center gap-6 pt-3 border-t border-outline-variant/20 relative z-10 mt-2">
                   <div className="flex flex-col">
-                    <span className="font-mono text-[13px] text-on-surface-variant mb-1">Progreso</span>
-                    <span className={`font-sans text-[18px] font-medium ${isUnassigned ? 'text-on-surface-variant' : 'text-primary'}`}>
+                    <span className="font-mono text-[12px] text-on-surface-variant mb-0.5">Progreso</span>
+                    <span className={`font-sans text-[17px] font-bold ${isUnassigned ? 'text-on-surface-variant' : 'text-primary'}`}>
                       {isUnassigned ? '-' : `${aisle.progress}%`}
                     </span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="font-mono text-[13px] text-on-surface-variant mb-1">Items Registrados</span>
-                    <span className="font-sans text-[18px] font-medium text-on-surface">{(aisle.productsCount || 0).toLocaleString()}</span>
+                    <span className="font-mono text-[12px] text-on-surface-variant mb-0.5">Items Registrados</span>
+                    <span className="font-sans text-[17px] font-bold text-on-surface">{(aisle.productsCount || 0).toLocaleString()}</span>
                   </div>
                 </div>
 
@@ -468,7 +475,7 @@ export function AislesView({ onNavigate, aisles, onAddAisle, onUpdateAisle, onDe
                   </div>
                 )}
               </div>
-            )
+            );
           })}
         </section>
       )}
