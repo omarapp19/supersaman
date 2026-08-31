@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Printer, ChevronDown, X, Store, CalendarDays, Package, ArrowUp, Pencil, SlidersHorizontal } from 'lucide-react';
+import { Search, Printer, ChevronDown, X, Store, CalendarDays, Package, ArrowUp, Pencil, SlidersHorizontal, Archive, RotateCcw, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ViewState, OrderItem, Aisle } from '../types';
 import { isFirebaseConfigured } from '../firebase';
 import { mockProductsByAisle } from '../data';
@@ -13,7 +13,17 @@ interface ComprasViewProps {
   checkedOrders: Set<string>;
   toggleChecked: (id: string) => void;
   onUpdateOrder: (orderId: string, updates: any) => Promise<void>;
+  onArchiveOrder?: (orderId: string, archiveState?: boolean) => Promise<void>;
+  onArchiveOldOrders?: (daysThreshold?: number) => Promise<number>;
   user?: any;
+}
+
+// Check if a date string is older than 30 days
+function isOlderThan30Days(isoOrLegacy: string): boolean {
+  const date = new Date(isoOrLegacy);
+  if (isNaN(date.getTime())) return false;
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+  return (Date.now() - date.getTime()) > thirtyDaysMs;
 }
 
 // Format ISO date string into a short date DD/MM/YY
@@ -59,7 +69,7 @@ function formatTime(isoOrLegacy: string): string {
   return date.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
 }
 
-export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleChecked, onUpdateOrder, user }: ComprasViewProps) {
+export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleChecked, onUpdateOrder, onArchiveOrder, onArchiveOldOrders, user }: ComprasViewProps) {
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAisleFilter, setSelectedAisleFilter] = useState<number | null>(null);
@@ -73,6 +83,11 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
   const [printGroupBy, setPrintGroupBy] = useState<'aisle' | 'day' | 'week' | 'operator'>('aisle');
   const [printScope, setPrintScope] = useState<'all' | 'pending' | 'completed'>('all');
   const [printStatusFilter, setPrintStatusFilter] = useState<'all' | 'critical' | 'critical-low'>('all');
+
+  // Main navigation tab & pagination states
+  const [mainTab, setMainTab] = useState<'pending' | '7days' | '30days' | 'archived'>('pending');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   const [showScrollTop, setShowScrollTop] = useState(false);
 
@@ -201,60 +216,113 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
     });
   };
 
-  const filteredOrders = orders.filter(order => {
-    // If operator, only show orders submitted by this operator
-    if (isOperator && operatorName) {
-      const orderUser = order.user || '';
-      if (orderUser.toLowerCase() !== operatorName.toLowerCase()) {
-        return false;
+  // Conteo de pedidos pendientes activos con más de 30 días sin solicitar
+  const oldPendingOrdersCount = useMemo(() => {
+    return orders.filter(o => {
+      const isChecked = checkedOrders.has(o.id);
+      return !o.archived && !isChecked && isOlderThan30Days(o.lastUpdated);
+    }).length;
+  }, [orders, checkedOrders]);
+
+  const handleBulkArchive = async () => {
+    if (onArchiveOldOrders && oldPendingOrdersCount > 0) {
+      if (window.confirm(`¿Deseas archivar los ${oldPendingOrdersCount} pedidos pendientes con más de 30 días? Se moverán a la pestaña "Archivadas / Histórico".`)) {
+        await onArchiveOldOrders(30);
       }
     }
+  };
 
-    const query = searchQuery.trim().toLowerCase();
-    if (query) {
-      const match =
-        order.productName.toLowerCase().includes(query) ||
-        order.brand.toLowerCase().includes(query) ||
-        order.sku.toLowerCase().includes(query);
-      if (!match) return false;
-    }
-    if (selectedAisleFilter !== null && order.aisle !== selectedAisleFilter) return false;
-    if (selectedStatusFilter !== null && order.status !== selectedStatusFilter) return false;
-    if (selectedOperatorFilter !== null) {
-      const orderUser = order.user || '';
-      if (orderUser.toLowerCase() !== selectedOperatorFilter.toLowerCase()) {
-        return false;
+  const filteredOrders = useMemo(() => {
+    const now = Date.now();
+    const ms7Days = 7 * 24 * 60 * 60 * 1000;
+    const ms30Days = 30 * 24 * 60 * 60 * 1000;
+
+    return orders.filter(order => {
+      const isChecked = checkedOrders.has(order.id);
+      const isArchived = Boolean(order.archived);
+      const orderTime = new Date(order.lastUpdated).getTime();
+
+      if (mainTab === 'pending') {
+        if (isArchived || isChecked) return false;
+      } else if (mainTab === '7days') {
+        if (isArchived) return false;
+        if (isNaN(orderTime) || (now - orderTime) > ms7Days) return false;
+      } else if (mainTab === '30days') {
+        if (isArchived) return false;
+        if (isNaN(orderTime) || (now - orderTime) > ms30Days) return false;
+      } else if (mainTab === 'archived') {
+        if (!isArchived && !isChecked) return false;
       }
-    }
-    if (selectedCompanyFilter !== null) {
-      const orderCompany = (order as any).company || '';
-      if (orderCompany.toLowerCase() !== selectedCompanyFilter.toLowerCase()) {
-        return false;
+
+      // If operator, only show orders submitted by this operator
+      if (isOperator && operatorName) {
+        const orderUser = order.user || '';
+        if (orderUser.toLowerCase() !== operatorName.toLowerCase()) {
+          return false;
+        }
       }
-    }
 
-    const isChecked = checkedOrders.has(order.id);
-    if (selectedCheckedFilter === 'pending' && isChecked) return false;
-    if (selectedCheckedFilter === 'completed' && !isChecked) return false;
+      const query = searchQuery.trim().toLowerCase();
+      if (query) {
+        const match =
+          order.productName.toLowerCase().includes(query) ||
+          order.brand.toLowerCase().includes(query) ||
+          order.sku.toLowerCase().includes(query);
+        if (!match) return false;
+      }
+      if (selectedAisleFilter !== null && order.aisle !== selectedAisleFilter) return false;
+      if (selectedStatusFilter !== null && order.status !== selectedStatusFilter) return false;
+      if (selectedOperatorFilter !== null) {
+        const orderUser = order.user || '';
+        if (orderUser.toLowerCase() !== selectedOperatorFilter.toLowerCase()) {
+          return false;
+        }
+      }
+      if (selectedCompanyFilter !== null) {
+        const orderCompany = (order as any).company || '';
+        if (orderCompany.toLowerCase() !== selectedCompanyFilter.toLowerCase()) {
+          return false;
+        }
+      }
 
-    return true;
-  });
+      if (selectedCheckedFilter === 'pending' && isChecked) return false;
+      if (selectedCheckedFilter === 'completed' && !isChecked) return false;
 
-  // Group filtered orders by day, most recent first
-  const grouped: { key: string; label: string; items: OrderItem[] }[] = [];
-  const seenKeys: Record<string, number> = {};
+      return true;
+    });
+  }, [orders, mainTab, checkedOrders, isOperator, operatorName, searchQuery, selectedAisleFilter, selectedStatusFilter, selectedOperatorFilter, selectedCompanyFilter, selectedCheckedFilter]);
 
-  filteredOrders.forEach(order => {
-    const key = getDayKey(order.lastUpdated);
-    if (seenKeys[key] === undefined) {
-      seenKeys[key] = grouped.length;
-      grouped.push({ key, label: formatDayLabel(order.lastUpdated), items: [] });
-    }
-    grouped[seenKeys[key]].items.push(order);
-  });
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [mainTab, searchQuery, selectedAisleFilter, selectedStatusFilter, selectedOperatorFilter, selectedCompanyFilter, selectedCheckedFilter]);
 
-  // Sort groups: most recent day first
-  grouped.sort((a, b) => b.key.localeCompare(a.key));
+  const totalItems = filteredOrders.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const validCurrentPage = Math.min(currentPage, totalPages);
+
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (validCurrentPage - 1) * itemsPerPage;
+    return filteredOrders.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredOrders, validCurrentPage, itemsPerPage]);
+
+  // Group paginated orders by day, most recent first
+  const grouped = useMemo(() => {
+    const list: { key: string; label: string; items: OrderItem[] }[] = [];
+    const seenKeys: Record<string, number> = {};
+
+    paginatedOrders.forEach(order => {
+      const key = getDayKey(order.lastUpdated);
+      if (seenKeys[key] === undefined) {
+        seenKeys[key] = list.length;
+        list.push({ key, label: formatDayLabel(order.lastUpdated), items: [] });
+      }
+      list[seenKeys[key]].items.push(order);
+    });
+
+    list.sort((a, b) => b.key.localeCompare(a.key));
+    return list;
+  }, [paginatedOrders]);
 
   const totalChecked = checkedOrders.size;
 
@@ -438,6 +506,91 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
             </button>
           </div>
         </div>
+
+        {/* Main Navigation Tabs */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6 border-b border-outline-variant/20 pb-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setMainTab('pending')}
+              className={`px-4 py-2.5 rounded-2xl font-sans text-[14px] font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm ${
+                mainTab === 'pending'
+                  ? 'bg-primary text-white'
+                  : 'bg-white border border-outline-variant/30 text-on-surface-variant hover:bg-surface-variant/40'
+              }`}
+            >
+              <Clock size={16} />
+              Pendientes Activos
+              {orders.filter(o => !o.archived && !checkedOrders.has(o.id)).length > 0 && (
+                <span className={`px-2 py-0.5 rounded-full font-mono text-[11px] font-bold ${mainTab === 'pending' ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'}`}>
+                  {orders.filter(o => !o.archived && !checkedOrders.has(o.id)).length}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMainTab('7days')}
+              className={`px-4 py-2.5 rounded-2xl font-sans text-[14px] font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm ${
+                mainTab === '7days'
+                  ? 'bg-primary text-white'
+                  : 'bg-white border border-outline-variant/30 text-on-surface-variant hover:bg-surface-variant/40'
+              }`}
+            >
+              Últimos 7 días
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMainTab('30days')}
+              className={`px-4 py-2.5 rounded-2xl font-sans text-[14px] font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm ${
+                mainTab === '30days'
+                  ? 'bg-primary text-white'
+                  : 'bg-white border border-outline-variant/30 text-on-surface-variant hover:bg-surface-variant/40'
+              }`}
+            >
+              Últimos 30 días
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setMainTab('archived')}
+            className={`px-4 py-2.5 rounded-2xl font-sans text-[14px] font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm ${
+              mainTab === 'archived'
+                ? 'bg-primary text-white'
+                : 'bg-white border border-outline-variant/30 text-on-surface-variant hover:bg-surface-variant/40'
+            }`}
+          >
+            <Archive size={16} />
+            Archivadas / Histórico
+          </button>
+        </div>
+
+        {/* Warning banner for pending orders > 30 days */}
+        {oldPendingOrdersCount > 0 && mainTab !== 'archived' && (
+          <div className="bg-amber-500/10 border border-amber-500/30 text-amber-950 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-500/20 text-amber-800 rounded-xl flex-shrink-0">
+                <Clock size={22} />
+              </div>
+              <div>
+                <h4 className="font-sans text-[15px] font-bold text-amber-950">Solicitudes pendientes antiguas detectadas</h4>
+                <p className="font-sans text-[13px] text-amber-900/90 mt-0.5">
+                  Hay <strong>{oldPendingOrdersCount}</strong> producto(s) en pendiente de hace más de 30 días sin solicitar a proveedores.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleBulkArchive}
+              className="px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-xl font-sans text-[13px] font-semibold transition-colors shadow-sm whitespace-nowrap cursor-pointer flex items-center gap-2 self-end sm:self-auto"
+            >
+              <Archive size={16} />
+              Archivar {oldPendingOrdersCount} pedido(s)
+            </button>
+          </div>
+        )}
 
         {/* Filter toolbar: order-status switch + a single "Filtros" toggle instead of 4 loose selects */}
         {(() => {
@@ -794,6 +947,19 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                                 <span className="font-sans text-[15px] font-bold text-on-surface whitespace-nowrap">
                                   {order.suggestedQty} {order.unit || 'und'}
                                 </span>
+
+                                {!isChecked && !order.archived && isOlderThan30Days(order.lastUpdated) && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/15 text-amber-900 rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-amber-500/30 whitespace-nowrap" title="Solicitud creada hace más de 30 días">
+                                    <Clock size={11} /> +30d
+                                  </span>
+                                )}
+
+                                {order.archived && (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-surface-variant text-on-surface-variant rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-outline-variant/40 whitespace-nowrap">
+                                    <Archive size={11} /> Archivado
+                                  </span>
+                                )}
+
                                 {isChecked
                                   ? <span className="inline-flex px-2.5 py-1 bg-primary/10 text-primary rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-primary/20 whitespace-nowrap">Pedido ✓</span>
                                   : <>
@@ -802,6 +968,35 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                                     {order.status === 'normal' && <span className="inline-flex px-2.5 py-1 bg-primary/10 text-primary rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-primary/20 whitespace-nowrap">Normal</span>}
                                   </>
                                 }
+
+                                {onArchiveOrder && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onArchiveOrder(order.id, !order.archived);
+                                    }}
+                                    className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 font-mono text-[11px] font-semibold ${
+                                      order.archived
+                                        ? 'text-primary hover:bg-primary/10'
+                                        : 'text-on-surface-variant hover:text-error hover:bg-error/10'
+                                    }`}
+                                    title={order.archived ? "Restaurar orden" : "Archivar orden"}
+                                  >
+                                    {order.archived ? (
+                                      <>
+                                        <RotateCcw size={14} />
+                                        <span className="hidden md:inline">Restaurar</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Archive size={14} />
+                                        <span className="hidden md:inline">Archivar</span>
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+
                                 <span className="font-mono text-[12px] text-on-surface-variant/60 hidden sm:block">
                                   {formatTime(order.lastUpdated)}
                                 </span>
@@ -817,6 +1012,61 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
             );
           })}
         </div>
+
+        {/* Pagination Bar */}
+        {totalItems > 0 && (
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 bg-card-surface border border-outline-variant/30 rounded-2xl p-4 shadow-sm">
+            <span className="font-mono text-[13px] text-on-surface-variant">
+              Página <strong className="text-on-surface">{validCurrentPage}</strong> de <strong className="text-on-surface">{totalPages}</strong> · Mostrando {Math.min(totalItems, (validCurrentPage - 1) * itemsPerPage + 1)} - {Math.min(totalItems, validCurrentPage * itemsPerPage)} de {totalItems} órdenes
+            </span>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={validCurrentPage === 1}
+                className="px-3 py-1.5 rounded-xl border border-outline-variant/30 text-on-surface-variant font-sans text-[13px] font-semibold hover:bg-surface-variant/40 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
+              >
+                <ChevronLeft size={16} />
+                Anterior
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - validCurrentPage) <= 1)
+                  .map((p, idx, arr) => {
+                    const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
+                    return (
+                      <span key={p} className="flex items-center gap-1">
+                        {showEllipsis && <span className="font-mono text-[12px] text-on-surface-variant px-1">...</span>}
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage(p)}
+                          className={`w-8 h-8 rounded-xl font-mono text-[13px] font-bold flex items-center justify-center transition-all cursor-pointer ${
+                            p === validCurrentPage
+                              ? 'bg-primary text-white shadow-sm'
+                              : 'hover:bg-surface-variant/40 text-on-surface-variant'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      </span>
+                    );
+                  })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={validCurrentPage === totalPages}
+                className="px-3 py-1.5 rounded-xl border border-outline-variant/30 text-on-surface-variant font-sans text-[13px] font-semibold hover:bg-surface-variant/40 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
+              >
+                Siguiente
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* PRINT-ONLY VIEW */}

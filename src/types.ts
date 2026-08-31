@@ -34,6 +34,8 @@ export interface OrderItem {
   status: 'normal' | 'bajo' | 'crítico';
   lastUpdated: string;
   checked?: boolean;
+  archived?: boolean;
+  archivedAt?: string;
   company?: string;
   und_x_caja?: number;
 }

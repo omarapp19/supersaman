@@ -160,6 +160,73 @@ function AppContent() {
     toast.success("Pedido actualizado con éxito.");
   };
 
+  const handleArchiveOrder = async (orderId: string, archiveState = true) => {
+    const updates = {
+      archived: archiveState,
+      archivedAt: new Date().toISOString()
+    };
+    if (isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'orders', orderId), updates);
+      } catch (error) {
+        console.error("Error al archivar pedido en Firestore:", error);
+        toast.error("Error al archivar el pedido.");
+        return;
+      }
+    } else {
+      setOrders(prev => {
+        const updated = prev.map(o => o.id === orderId ? { ...o, ...updates } : o);
+        localStorage.setItem('saman_orders', JSON.stringify(updated));
+        return updated;
+      });
+    }
+    toast.success(archiveState ? "Pedido archivado con éxito." : "Pedido restaurado.");
+  };
+
+  const handleArchiveOldOrders = async (daysThreshold = 30): Promise<number> => {
+    const now = Date.now();
+    const cutoffMs = daysThreshold * 24 * 60 * 60 * 1000;
+    const oldOrders = orders.filter(o => {
+      if (o.archived) return false;
+      const orderDate = new Date(o.lastUpdated).getTime();
+      if (isNaN(orderDate)) return false;
+      return (now - orderDate) > cutoffMs;
+    });
+
+    if (oldOrders.length === 0) {
+      toast.info(`No hay pedidos pendientes con más de ${daysThreshold} días.`);
+      return 0;
+    }
+
+    const archivedAt = new Date().toISOString();
+    let count = 0;
+
+    for (const order of oldOrders) {
+      if (isFirebaseConfigured) {
+        try {
+          await updateDoc(doc(db, 'orders', order.id), { archived: true, archivedAt });
+          count++;
+        } catch (error) {
+          console.error(`Error al archivar orden ${order.id}:`, error);
+        }
+      } else {
+        count++;
+      }
+    }
+
+    if (!isFirebaseConfigured) {
+      const oldIds = new Set(oldOrders.map(o => o.id));
+      setOrders(prev => {
+        const updated = prev.map(o => oldIds.has(o.id) ? { ...o, archived: true, archivedAt } : o);
+        localStorage.setItem('saman_orders', JSON.stringify(updated));
+        return updated;
+      });
+    }
+
+    toast.success(`Se archivaron ${count} pedidos de más de ${daysThreshold} días.`);
+    return count;
+  };
+
   useEffect(() => {
     if (isFirebaseConfigured) {
       let unsubscribeUserDoc: (() => void) | null = null;
@@ -654,7 +721,7 @@ function AppContent() {
           />
         )}
         {currentView === 'compras' && (
-          <ComprasView orders={orders} onNavigate={navigateToView} aisles={aisles} checkedOrders={checkedOrders} toggleChecked={toggleChecked} onUpdateOrder={handleUpdateOrder} user={user} />
+          <ComprasView orders={orders} onNavigate={navigateToView} aisles={aisles} checkedOrders={checkedOrders} toggleChecked={toggleChecked} onUpdateOrder={handleUpdateOrder} onArchiveOrder={handleArchiveOrder} onArchiveOldOrders={handleArchiveOldOrders} user={user} />
         )}
         {currentView === 'configuracion' && (
           <ConfiguracionView aisles={aisles} users={users} setUsers={setUsers} onNavigate={navigateToView} user={user} />
