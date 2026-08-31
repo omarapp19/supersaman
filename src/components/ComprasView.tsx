@@ -87,7 +87,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
   // Main navigation tab & pagination states
   const [mainTab, setMainTab] = useState<'pending' | '7days' | '30days' | 'archived'>('pending');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState<number>(50); // Default to 50 so weekly items fit on screen
 
   const [showScrollTop, setShowScrollTop] = useState(false);
 
@@ -298,13 +298,15 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
   }, [mainTab, searchQuery, selectedAisleFilter, selectedStatusFilter, selectedOperatorFilter, selectedCompanyFilter, selectedCheckedFilter]);
 
   const totalItems = filteredOrders.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const effectiveItemsPerPage = itemsPerPage === 0 ? Math.max(1, totalItems) : itemsPerPage;
+  const totalPages = Math.max(1, Math.ceil(totalItems / effectiveItemsPerPage));
   const validCurrentPage = Math.min(currentPage, totalPages);
 
   const paginatedOrders = useMemo(() => {
-    const startIndex = (validCurrentPage - 1) * itemsPerPage;
-    return filteredOrders.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredOrders, validCurrentPage, itemsPerPage]);
+    if (itemsPerPage === 0) return filteredOrders;
+    const startIndex = (validCurrentPage - 1) * effectiveItemsPerPage;
+    return filteredOrders.slice(startIndex, startIndex + effectiveItemsPerPage);
+  }, [filteredOrders, validCurrentPage, effectiveItemsPerPage, itemsPerPage]);
 
   // Group paginated orders by day, most recent first
   const grouped = useMemo(() => {
@@ -1015,56 +1017,82 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
 
         {/* Pagination Bar */}
         {totalItems > 0 && (
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 bg-card-surface border border-outline-variant/30 rounded-2xl p-4 shadow-sm">
-            <span className="font-mono text-[13px] text-on-surface-variant">
-              Página <strong className="text-on-surface">{validCurrentPage}</strong> de <strong className="text-on-surface">{totalPages}</strong> · Mostrando {Math.min(totalItems, (validCurrentPage - 1) * itemsPerPage + 1)} - {Math.min(totalItems, validCurrentPage * itemsPerPage)} de {totalItems} órdenes
-            </span>
+          <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4 bg-card-surface border border-outline-variant/30 rounded-2xl p-4 shadow-sm">
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="font-mono text-[13px] text-on-surface-variant">
+                Página <strong className="text-on-surface">{validCurrentPage}</strong> de <strong className="text-on-surface">{totalPages}</strong> · Mostrando {itemsPerPage === 0 ? totalItems : Math.min(totalItems, (validCurrentPage - 1) * effectiveItemsPerPage + 1)} - {itemsPerPage === 0 ? totalItems : Math.min(totalItems, validCurrentPage * effectiveItemsPerPage)} de {totalItems} órdenes
+              </span>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={validCurrentPage === 1}
-                className="px-3 py-1.5 rounded-xl border border-outline-variant/30 text-on-surface-variant font-sans text-[13px] font-semibold hover:bg-surface-variant/40 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
-              >
-                <ChevronLeft size={16} />
-                Anterior
-              </button>
-
-              <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(p => p === 1 || p === totalPages || Math.abs(p - validCurrentPage) <= 1)
-                  .map((p, idx, arr) => {
-                    const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
-                    return (
-                      <span key={p} className="flex items-center gap-1">
-                        {showEllipsis && <span className="font-mono text-[12px] text-on-surface-variant px-1">...</span>}
-                        <button
-                          type="button"
-                          onClick={() => setCurrentPage(p)}
-                          className={`w-8 h-8 rounded-xl font-mono text-[13px] font-bold flex items-center justify-center transition-all cursor-pointer ${
-                            p === validCurrentPage
-                              ? 'bg-primary text-white shadow-sm'
-                              : 'hover:bg-surface-variant/40 text-on-surface-variant'
-                          }`}
-                        >
-                          {p}
-                        </button>
-                      </span>
-                    );
-                  })}
+              {/* Items per page selector */}
+              <div className="flex items-center gap-1 bg-surface-variant/30 p-1 rounded-xl border border-outline-variant/20">
+                <span className="font-mono text-[11px] text-on-surface-variant px-1.5 font-bold uppercase">Por página:</span>
+                {[50, 100, 200, 0].map(val => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => {
+                      setItemsPerPage(val);
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold transition-all cursor-pointer ${
+                      itemsPerPage === val
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    {val === 0 ? 'Todos' : val}
+                  </button>
+                ))}
               </div>
-
-              <button
-                type="button"
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={validCurrentPage === totalPages}
-                className="px-3 py-1.5 rounded-xl border border-outline-variant/30 text-on-surface-variant font-sans text-[13px] font-semibold hover:bg-surface-variant/40 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
-              >
-                Siguiente
-                <ChevronRight size={16} />
-              </button>
             </div>
+
+            {itemsPerPage !== 0 && totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={validCurrentPage === 1}
+                  className="px-3 py-1.5 rounded-xl border border-outline-variant/30 text-on-surface-variant font-sans text-[13px] font-semibold hover:bg-surface-variant/40 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
+                >
+                  <ChevronLeft size={16} />
+                  Anterior
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === totalPages || Math.abs(p - validCurrentPage) <= 1)
+                    .map((p, idx, arr) => {
+                      const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
+                      return (
+                        <span key={p} className="flex items-center gap-1">
+                          {showEllipsis && <span className="font-mono text-[12px] text-on-surface-variant px-1">...</span>}
+                          <button
+                            type="button"
+                            onClick={() => setCurrentPage(p)}
+                            className={`w-8 h-8 rounded-xl font-mono text-[13px] font-bold flex items-center justify-center transition-all cursor-pointer ${
+                              p === validCurrentPage
+                                ? 'bg-primary text-white shadow-sm'
+                                : 'hover:bg-surface-variant/40 text-on-surface-variant'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        </span>
+                      );
+                    })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={validCurrentPage === totalPages}
+                  className="px-3 py-1.5 rounded-xl border border-outline-variant/30 text-on-surface-variant font-sans text-[13px] font-semibold hover:bg-surface-variant/40 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
+                >
+                  Siguiente
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
