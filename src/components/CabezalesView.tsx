@@ -66,8 +66,8 @@ function isPaidForCurrentPeriod(cabezal: Cabezal): boolean {
 // longer labels — below 10px it stops being legible, so longer names truncate instead
 // (see the `line-clamp-2` + `title` attribute on the label itself).
 function getDiagramLabelSizeClass(label: string): string {
-  if (label.length <= 12) return 'text-[10px]';
-  return 'text-[10px] leading-[1.05]';
+  if (label.length <= 12) return 'text-xs';
+  return 'text-xs leading-[1.05]';
 }
 
 function loadLocalPagos(cabezalId: string): CabezalPago[] {
@@ -179,7 +179,7 @@ export function CabezalesView({ cabezales, aisles, onAddCabezal, onUpdateCabezal
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[15px] font-semibold transition-all shadow-md self-start sm:self-auto cursor-pointer"
+            className="flex items-center justify-center gap-2 px-6 min-h-12 bg-primary-container text-on-primary hover:bg-primary/95 rounded-2xl font-sans text-[15px] font-semibold transition-all shadow-md self-start sm:self-auto cursor-pointer"
           >
             <Plus size={18} />
             Nuevo Cabezal
@@ -189,13 +189,13 @@ export function CabezalesView({ cabezales, aisles, onAddCabezal, onUpdateCabezal
         <div className="flex gap-1 mb-6 bg-surface-variant/30 p-1 rounded-full w-fit">
           <button
             onClick={() => setActiveTab('lista')}
-            className={`px-5 py-2 rounded-full font-sans text-[14px] font-semibold transition-all cursor-pointer ${activeTab === 'lista' ? 'bg-primary text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+            className={`px-5 min-h-12 rounded-2xl font-sans text-[14px] font-semibold transition-all cursor-pointer ${activeTab === 'lista' ? 'bg-primary-container text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
           >
             Lista
           </button>
           <button
             onClick={() => setActiveTab('diagrama')}
-            className={`px-5 py-2 rounded-full font-sans text-[14px] font-semibold transition-all cursor-pointer ${activeTab === 'diagrama' ? 'bg-primary text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+            className={`px-5 min-h-12 rounded-2xl font-sans text-[14px] font-semibold transition-all cursor-pointer ${activeTab === 'diagrama' ? 'bg-primary-container text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
           >
             Diagrama
           </button>
@@ -280,7 +280,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       </div>
       <h3 className="font-sans text-[20px] font-bold text-on-surface mb-2">No hay cabezales registrados</h3>
       <p className="font-sans text-[15px] text-on-surface-variant max-w-md mb-6">Crea el primer cabezal para empezar a gestionar su alquiler.</p>
-      <button onClick={onAdd} className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[15px] font-semibold transition-all shadow-md cursor-pointer">
+      <button onClick={onAdd} className="flex items-center justify-center gap-2 px-6 min-h-12 bg-primary-container text-on-primary hover:bg-primary/95 rounded-2xl font-sans text-[15px] font-semibold transition-all shadow-md cursor-pointer">
         <Plus size={18} />
         Nuevo Cabezal
       </button>
@@ -308,7 +308,7 @@ function CabezalCard({ cabezal, aisles, onClick, onDelete }: {
       <div className="flex justify-between items-start mb-3">
         <div className="min-w-0">
           <h3 className="font-sans text-[18px] font-bold text-on-surface truncate">{cabezal.label}</h3>
-          {linkedAisle && <span className="font-mono text-[12px] text-on-surface-variant truncate block">{linkedAisle.name}</span>}
+          {linkedAisle && <span className="font-mono text-xs text-on-surface-variant truncate block">{linkedAisle.name}</span>}
         </div>
         <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0">
           <RowActionButton icon={Trash2} size="sm" variant="danger" label="Eliminar cabezal" onClick={onDelete} />
@@ -321,15 +321,15 @@ function CabezalCard({ cabezal, aisles, onClick, onDelete }: {
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-        <span className={`px-2.5 py-1 rounded-full font-mono text-[10.5px] font-bold uppercase ${isRented ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-surface-variant/50 text-on-surface-variant border border-outline-variant/30'}`}>
+        <span className={`px-2.5 py-1 rounded-full font-sans font-semibold text-xs font-bold ${isRented ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-surface-variant/50 text-on-surface-variant border border-outline-variant/30'}`}>
           {isRented ? 'Alquilado' : 'Vacante'}
         </span>
         {isRented && (
           <>
-            <span className={`px-2.5 py-1 rounded-full font-mono text-[10.5px] font-bold uppercase ${expired ? 'bg-error-container text-on-error-container border border-error/20' : 'bg-primary/10 text-primary border border-primary/20'}`}>
+            <span className={`px-2.5 py-1 rounded-full font-sans font-semibold text-xs font-bold ${expired ? 'bg-error-container text-on-error-container border border-error/20' : 'bg-primary/10 text-primary border border-primary/20'}`}>
               {expired ? 'Vencido' : 'Vigente'}
             </span>
-            <span className={`px-2.5 py-1 rounded-full font-mono text-[10.5px] font-bold uppercase ${paidThisPeriod ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-tertiary-container/40 text-on-tertiary-fixed-variant border border-tertiary-fixed-dim/60'}`}>
+            <span className={`px-2.5 py-1 rounded-full font-sans font-semibold text-xs font-bold ${paidThisPeriod ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-tertiary-container/40 text-on-tertiary-fixed-variant border border-tertiary-fixed-dim/60'}`}>
               {paidThisPeriod ? 'Pagado' : 'En Deuda'}
             </span>
           </>
@@ -349,8 +349,8 @@ function AddCabezalModal({ aisles, label, setLabel, linkedAisleId, setLinkedAisl
   onSubmit: (e: FormEvent) => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
-      <div className="bg-card-surface rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-inverse-surface/50 z-[70] flex items-end md:items-center justify-center md:p-4 animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-card-surface rounded-t-3xl md:rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-y-auto max-h-[92dvh] border border-outline-variant/30 animate-in slide-in-from-bottom md:slide-in-from-bottom-0 md:zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center p-6 border-b border-outline-variant/20">
           <h3 className="font-sans text-[20px] font-bold text-on-surface">Nuevo Cabezal</h3>
           <button onClick={onClose} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-variant transition-colors cursor-pointer">
@@ -359,7 +359,7 @@ function AddCabezalModal({ aisles, label, setLabel, linkedAisleId, setLinkedAisl
         </div>
         <form onSubmit={onSubmit} className="p-6 flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Nombre / Ubicación</label>
+            <label className="font-sans font-semibold text-xs text-on-surface-variant ">Nombre / Ubicación</label>
             <input
               type="text"
               required
@@ -371,7 +371,7 @@ function AddCabezalModal({ aisles, label, setLabel, linkedAisleId, setLinkedAisl
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Pasillo vinculado (opcional)</label>
+            <label className="font-sans font-semibold text-xs text-on-surface-variant ">Pasillo vinculado (opcional)</label>
             <select
               value={linkedAisleId}
               onChange={(e) => setLinkedAisleId(e.target.value)}
@@ -385,7 +385,7 @@ function AddCabezalModal({ aisles, label, setLabel, linkedAisleId, setLinkedAisl
             <button type="button" onClick={onClose} className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer">
               Cancelar
             </button>
-            <button type="submit" className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer">
+            <button type="submit" className="flex-1 bg-primary-container text-on-primary hover:bg-primary/95 font-sans text-[14px] font-semibold min-h-12 rounded-2xl shadow-sm transition-all cursor-pointer">
               Crear Cabezal
             </button>
           </div>
@@ -509,12 +509,12 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
-      <div className="bg-card-surface rounded-[32px] w-full max-w-lg max-h-[90vh] flex flex-col shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-inverse-surface/50 z-[70] flex items-end md:items-center justify-center md:p-4 animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-card-surface rounded-t-3xl md:rounded-[32px] w-full max-w-lg max-h-[92dvh] flex flex-col shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in slide-in-from-bottom md:slide-in-from-bottom-0 md:zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center p-6 border-b border-outline-variant/20 flex-shrink-0">
           <div className="min-w-0">
             <h3 className="font-sans text-[20px] font-bold text-on-surface truncate">{cabezal.label}</h3>
-            {linkedAisle && <p className="font-mono text-[12px] text-on-surface-variant mt-0.5 truncate">Vinculado a {linkedAisle.name}</p>}
+            {linkedAisle && <p className="font-mono text-xs text-on-surface-variant mt-0.5 truncate">Vinculado a {linkedAisle.name}</p>}
           </div>
           <button onClick={onClose} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-variant transition-colors cursor-pointer flex-shrink-0">
             <X size={20} />
@@ -523,15 +523,15 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
 
         <form onSubmit={handleSave} className="p-6 flex flex-col gap-4 overflow-y-auto flex-grow">
           <div className="flex flex-wrap gap-2">
-            <span className={`px-2.5 py-1 rounded-full font-mono text-[11px] font-bold uppercase ${tenantCompany ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-surface-variant/50 text-on-surface-variant border border-outline-variant/30'}`}>
+            <span className={`px-2.5 py-1 rounded-full font-sans font-semibold text-xs font-bold ${tenantCompany ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-surface-variant/50 text-on-surface-variant border border-outline-variant/30'}`}>
               {tenantCompany ? 'Alquilado' : 'Vacante'}
             </span>
             {tenantCompany && (
               <>
-                <span className={`px-2.5 py-1 rounded-full font-mono text-[11px] font-bold uppercase ${expired ? 'bg-error-container text-on-error-container border border-error/20' : 'bg-primary/10 text-primary border border-primary/20'}`}>
+                <span className={`px-2.5 py-1 rounded-full font-sans font-semibold text-xs font-bold ${expired ? 'bg-error-container text-on-error-container border border-error/20' : 'bg-primary/10 text-primary border border-primary/20'}`}>
                   {expired ? 'Vencido' : 'Vigente'}
                 </span>
-                <span className={`px-2.5 py-1 rounded-full font-mono text-[11px] font-bold uppercase ${paidThisPeriod ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-tertiary-container/40 text-on-tertiary-fixed-variant border border-tertiary-fixed-dim/60'}`}>
+                <span className={`px-2.5 py-1 rounded-full font-sans font-semibold text-xs font-bold ${paidThisPeriod ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-tertiary-container/40 text-on-tertiary-fixed-variant border border-tertiary-fixed-dim/60'}`}>
                   {paidThisPeriod ? 'Pagado' : 'En Deuda'}
                 </span>
               </>
@@ -544,7 +544,7 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
                 <span className="font-sans text-[13.5px] font-semibold text-on-surface block">
                   Pago de {formatBillingPeriodLabel(currentPeriodLabel)}
                 </span>
-                <span className="font-mono text-[11px] text-on-surface-variant">
+                <span className="font-mono text-xs text-on-surface-variant">
                   {paidThisPeriod ? 'Ya se registró el pago de este mes.' : 'El ciclo mensual reinicia cada día 5.'}
                 </span>
               </div>
@@ -552,7 +552,7 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
                 type="button"
                 onClick={handleRegisterPago}
                 disabled={paidThisPeriod}
-                className="flex-shrink-0 px-4 py-2.5 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[13px] font-semibold transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-shrink-0 px-4 min-h-12 bg-primary-container text-on-primary hover:bg-primary/95 rounded-2xl font-sans text-[13px] font-semibold transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {paidThisPeriod ? 'Pagado' : 'Registrar Pago'}
               </button>
@@ -560,7 +560,7 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
           )}
 
           <div className="flex flex-col gap-1.5">
-            <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Empresa que alquila</label>
+            <label className="font-sans font-semibold text-xs text-on-surface-variant ">Empresa que alquila</label>
             <input
               type="text"
               value={tenantCompany}
@@ -572,7 +572,7 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Tipo de pago</label>
+              <label className="font-sans font-semibold text-xs text-on-surface-variant ">Tipo de pago</label>
               <select
                 value={paymentType}
                 onChange={(e) => setPaymentType(e.target.value as PaymentType)}
@@ -584,7 +584,7 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">
+              <label className="font-sans font-semibold text-xs text-on-surface-variant ">
                 {paymentType === 'porcentaje' ? 'Porcentaje (%)' : 'Monto ($)'}
               </label>
               <input
@@ -601,7 +601,7 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Notas del acuerdo</label>
+            <label className="font-sans font-semibold text-xs text-on-surface-variant ">Notas del acuerdo</label>
             <textarea
               value={paymentNotes}
               onChange={(e) => setPaymentNotes(e.target.value)}
@@ -613,7 +613,7 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Inicio del período</label>
+              <label className="font-sans font-semibold text-xs text-on-surface-variant ">Inicio del período</label>
               <input
                 type="date"
                 value={periodStart}
@@ -622,7 +622,7 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Vencimiento</label>
+              <label className="font-sans font-semibold text-xs text-on-surface-variant ">Vencimiento</label>
               <input
                 type="date"
                 value={periodEnd}
@@ -644,7 +644,7 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
           <button
             type="button"
             onClick={() => setShowHistory(s => !s)}
-            className="text-on-surface-variant font-mono text-[12px] uppercase tracking-wider text-left cursor-pointer"
+            className="text-on-surface-variant font-sans font-semibold text-xs text-left cursor-pointer"
           >
             {showHistory ? 'Ocultar' : 'Ver'} historial de pagos ({pagos.length})
           </button>
@@ -652,12 +652,12 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
           {showHistory && (
             <div className="flex flex-col gap-2 max-h-[160px] overflow-y-auto bg-white/40 rounded-2xl p-3 border border-outline-variant/20">
               {loadingPagos ? (
-                <span className="font-mono text-[12px] text-on-surface-variant">Cargando...</span>
+                <span className="font-mono text-xs text-on-surface-variant">Cargando...</span>
               ) : pagos.length === 0 ? (
-                <span className="font-mono text-[12px] text-on-surface-variant">Sin períodos anteriores registrados.</span>
+                <span className="font-mono text-xs text-on-surface-variant">Sin períodos anteriores registrados.</span>
               ) : (
                 pagos.map(p => (
-                  <div key={p.id} className="flex justify-between items-center text-[12px] font-mono border-b border-outline-variant/10 pb-1.5 last:border-0">
+                  <div key={p.id} className="flex justify-between items-center text-xs font-mono border-b border-outline-variant/10 pb-1.5 last:border-0">
                     <span className="text-on-surface">{p.periodStart} → {p.periodEnd}</span>
                     <span className={p.isPaid ? 'text-primary' : 'text-on-tertiary-fixed-variant'}>{p.isPaid ? 'Pagado' : 'Pendiente'}</span>
                   </div>
@@ -675,7 +675,7 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
             >
               <Trash2 size={16} />
             </button>
-            <button type="submit" className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer">
+            <button type="submit" className="flex-1 bg-primary-container text-on-primary hover:bg-primary/95 font-sans text-[14px] font-semibold min-h-12 rounded-2xl shadow-sm transition-all cursor-pointer">
               Guardar Cambios
             </button>
           </div>
@@ -687,8 +687,8 @@ function CabezalDetailModal({ cabezal, aisles, onClose, onUpdate, onDelete }: {
 
 function ConfirmDeleteModal({ cabezal, onCancel, onConfirm }: { cabezal: Cabezal; onCancel: () => void; onConfirm: () => void }) {
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onCancel}>
-      <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-inverse-surface/50 z-[70] flex items-end md:items-center justify-center md:p-4 animate-in fade-in duration-200" onClick={onCancel}>
+      <div className="bg-card-surface rounded-t-3xl md:rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-y-auto max-h-[92dvh] border border-outline-variant/30 animate-in slide-in-from-bottom md:slide-in-from-bottom-0 md:zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
         <div className="p-6 flex flex-col items-center text-center gap-4">
           <div className="w-14 h-14 rounded-full bg-error-container flex items-center justify-center">
             <Trash2 size={26} className="text-error" />
@@ -946,13 +946,13 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
   return (
     <div className="bg-card-surface rounded-3xl p-4 shadow-[0_4px_20px_rgba(40,28,25,0.05)]">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4">
-        <p className="font-mono text-[11px] sm:text-[12px] text-on-surface-variant uppercase tracking-wider max-w-md">
+        <p className="font-sans font-semibold text-xs sm:text-xs text-on-surface-variant max-w-md">
           Arrastra cabezales y estantes para armar el plano de la tienda
         </p>
         <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-start md:justify-end">
           <button
             onClick={toggleSnapToGrid}
-            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full font-sans text-[12px] font-semibold transition-all border cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full font-sans text-xs font-semibold transition-all border cursor-pointer ${
               snapToGrid 
                 ? 'bg-primary/10 text-primary border-primary/30 hover:bg-primary/20' 
                 : 'bg-white text-on-surface-variant border-outline-variant/30 hover:bg-surface-variant/30'
@@ -964,7 +964,7 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
           </button>
           <button
             onClick={toggleSnapToElements}
-            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full font-sans text-[12px] font-semibold transition-all border cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full font-sans text-xs font-semibold transition-all border cursor-pointer ${
               snapToElements 
                 ? 'bg-primary/10 text-primary border-primary/30 hover:bg-primary/20' 
                 : 'bg-white text-on-surface-variant border-outline-variant/30 hover:bg-surface-variant/30'
@@ -985,7 +985,7 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
                 return next;
               });
             }}
-            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full font-sans text-[12px] font-semibold transition-all border cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full font-sans text-xs font-semibold transition-all border cursor-pointer ${
               isAllSelected 
                 ? 'bg-primary/20 text-primary border-primary hover:bg-primary/30' 
                 : 'bg-white text-on-surface-variant border-outline-variant/30 hover:bg-surface-variant/30'
@@ -1020,7 +1020,7 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
           <button
             type="button"
             onClick={() => onAddElement()}
-            className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[12.5px] font-semibold transition-all shadow-sm cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-primary-container text-on-primary hover:bg-primary/95 rounded-2xl font-sans text-[12.5px] font-semibold transition-all shadow-sm cursor-pointer"
             title="Agregar estante"
           >
             <Rows3 size={14} />
@@ -1173,7 +1173,7 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
                     } ${isAllSelected ? 'ring-2 ring-primary border-primary bg-primary/10' : ''}`}
                   >
                     <span className={`w-full leading-tight line-clamp-2 ${getDiagramLabelSizeClass(cab.label)}`}>{cab.label}</span>
-                    <span className="w-full font-mono text-[7px] font-normal opacity-70 leading-none truncate mt-0.5">{isRented ? cab.tenantCompany : 'Vacante'}</span>
+                    <span className="w-full font-mono text-xs font-normal opacity-70 leading-none truncate mt-0.5">{isRented ? cab.tenantCompany : 'Vacante'}</span>
                   </button>
                 );
               })}
@@ -1195,7 +1195,7 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
             <button
               type="button"
               onClick={handleZoomReset}
-              className="px-2 py-0.5 rounded text-[11px] font-mono font-semibold text-on-surface-variant hover:bg-surface-variant/40 transition-colors cursor-pointer"
+              className="px-2 py-0.5 rounded text-xs font-mono font-semibold text-on-surface-variant hover:bg-surface-variant/40 transition-colors cursor-pointer"
               title="Restablecer a 100%"
             >
               {Math.round(zoom * 100)}%
@@ -1215,7 +1215,7 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
             <button
               type="button"
               onClick={() => setIsAutoFit(true)}
-              className={`px-3 py-1 rounded-full font-sans text-[11px] font-bold transition-all border cursor-pointer ${
+              className={`px-3 py-1 rounded-full font-sans text-xs font-bold transition-all border cursor-pointer ${
                 isAutoFit 
                   ? 'bg-primary/10 text-primary border-primary/20' 
                   : 'bg-transparent text-on-surface-variant border-transparent hover:bg-surface-variant/40'
@@ -1235,7 +1235,7 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
               <Rows3 size={15} className="text-primary" />
               Configurar Estante
             </span>
-            <span className="font-sans text-[11px] sm:text-[12px] text-on-surface-variant">Personaliza las dimensiones del estante seleccionado en tiempo real</span>
+            <span className="font-sans text-xs sm:text-xs text-on-surface-variant">Personaliza las dimensiones del estante seleccionado en tiempo real</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-4 sm:gap-6">
@@ -1269,7 +1269,7 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
                 >
                   +
                 </button>
-                <span className="font-mono text-[11px] text-on-surface-variant ml-0.5">px</span>
+                <span className="font-mono text-xs text-on-surface-variant ml-0.5">px</span>
               </div>
             </div>
 
@@ -1303,7 +1303,7 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
                 >
                   +
                 </button>
-                <span className="font-mono text-[11px] text-on-surface-variant ml-0.5">px</span>
+                <span className="font-mono text-xs text-on-surface-variant ml-0.5">px</span>
               </div>
             </div>
 
@@ -1318,7 +1318,7 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
                   });
                   toast.success('Configuración del estante copiada.');
                 }}
-                className="flex items-center gap-1 px-3 py-1 border border-outline-variant/30 rounded-full bg-white hover:bg-surface-variant/30 font-sans text-[12px] font-semibold text-on-surface transition-all cursor-pointer shadow-sm active:scale-95"
+                className="flex items-center gap-1 px-3 py-1 border border-outline-variant/30 rounded-full bg-white hover:bg-surface-variant/30 font-sans text-xs font-semibold text-on-surface transition-all cursor-pointer shadow-sm active:scale-95"
                 title="Copiar configuración de este estante"
               >
                 <Copy size={12} className="text-on-surface-variant" />
@@ -1336,7 +1336,7 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
                   });
                   toast.success('Estante duplicado.');
                 }}
-                className="flex items-center gap-1 px-3 py-1 border border-outline-variant/30 rounded-full bg-white hover:bg-surface-variant/30 font-sans text-[12px] font-semibold text-on-surface transition-all cursor-pointer shadow-sm active:scale-95"
+                className="flex items-center gap-1 px-3 py-1 border border-outline-variant/30 rounded-full bg-white hover:bg-surface-variant/30 font-sans text-xs font-semibold text-on-surface transition-all cursor-pointer shadow-sm active:scale-95"
                 title="Duplicar este estante con la misma configuración"
               >
                 <Plus size={12} className="text-on-surface-variant" />
@@ -1345,7 +1345,7 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
               <button
                 type="button"
                 onClick={() => onUpdateElement(selectedElement.id, { rotation: (selectedElement.rotation + 90) % 180 })}
-                className="flex items-center gap-1 px-3 py-1 border border-outline-variant/30 rounded-full bg-white hover:bg-surface-variant/30 font-sans text-[12px] font-semibold text-on-surface transition-all cursor-pointer shadow-sm active:scale-95"
+                className="flex items-center gap-1 px-3 py-1 border border-outline-variant/30 rounded-full bg-white hover:bg-surface-variant/30 font-sans text-xs font-semibold text-on-surface transition-all cursor-pointer shadow-sm active:scale-95"
                 title="Rotar estante 90 grados"
               >
                 <RotateCw size={12} className="text-on-surface-variant" />
@@ -1354,7 +1354,7 @@ function DiagramCanvas({ cabezales, onUpdateCabezal, onOpenDetail, elements, onA
               <button
                 type="button"
                 onClick={() => { onDeleteElement(selectedElement.id); setSelectedElementId(null); }}
-                className="flex items-center gap-1 px-3 py-1 border border-error/20 rounded-full bg-white hover:bg-error/5 font-sans text-[12px] font-semibold text-error transition-all cursor-pointer shadow-sm active:scale-95"
+                className="flex items-center gap-1 px-3 py-1 border border-error/20 rounded-full bg-white hover:bg-error/5 font-sans text-xs font-semibold text-error transition-all cursor-pointer shadow-sm active:scale-95"
                 title="Eliminar estante"
               >
                 <X size={12} />

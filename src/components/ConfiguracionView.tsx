@@ -234,7 +234,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
               <div className="flex justify-between items-center bg-white/50 p-4 rounded-2xl border border-outline-variant/20">
                 <div>
                   <span className="font-sans text-[15px] font-semibold text-on-surface block">Alertas Push de Stock Crítico</span>
-                  <span className="font-mono text-[12px] text-on-surface-variant">Notificar inmediatamente a los administradores al detectar quiebre.</span>
+                  <span className="font-mono text-xs text-on-surface-variant">Notificar inmediatamente a los administradores al detectar quiebre.</span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -250,7 +250,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
               <div className="flex justify-between items-center bg-white/50 p-4 rounded-2xl border border-outline-variant/20">
                 <div>
                   <span className="font-sans text-[15px] font-semibold text-on-surface block">Sincronización Offline en Segundo Plano</span>
-                  <span className="font-mono text-[12px] text-on-surface-variant">Guardar datos locales y subirlos cuando vuelva la red.</span>
+                  <span className="font-mono text-xs text-on-surface-variant">Guardar datos locales y subirlos cuando vuelva la red.</span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -290,7 +290,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                   setUserAisles([]);
                   setShowUserModal(true);
                 }}
-                className="flex items-center justify-center gap-1.5 px-5 py-2.5 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[13px] font-semibold transition-all shadow-sm cursor-pointer self-start sm:self-auto"
+                className="flex items-center justify-center gap-1.5 px-5 min-h-12 bg-primary-container text-on-primary hover:bg-primary/95 rounded-2xl font-sans text-[13px] font-semibold transition-all shadow-sm cursor-pointer self-start sm:self-auto"
               >
                 <UserPlus size={16} />
                 Nuevo Usuario
@@ -321,11 +321,11 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                       <div className="flex flex-col">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-sans text-[16px] font-bold text-on-surface">{u.fullName}</span>
-                          {u.role === 'admin' && <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full font-mono text-[10px] font-bold uppercase border border-primary/20">Admin</span>}
-                          {u.role === 'supervisor' && <span className="px-2 py-0.5 bg-tertiary-container/40 text-on-tertiary-fixed-variant rounded-full font-mono text-[10px] font-bold uppercase border border-tertiary-fixed-dim/60">Supervisor</span>}
-                          {u.role === 'operador' && <span className="px-2 py-0.5 bg-secondary-container text-on-secondary-container rounded-full font-mono text-[10px] font-bold uppercase border border-secondary/20">Operador</span>}
+                          {u.role === 'admin' && <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full font-sans font-semibold text-xs font-bold border border-primary/20">Admin</span>}
+                          {u.role === 'supervisor' && <span className="px-2 py-0.5 bg-tertiary-container/40 text-on-tertiary-fixed-variant rounded-full font-sans font-semibold text-xs font-bold border border-tertiary-fixed-dim/60">Supervisor</span>}
+                          {u.role === 'operador' && <span className="px-2 py-0.5 bg-secondary-container text-on-secondary-container rounded-full font-sans font-semibold text-xs font-bold border border-secondary/20">Operador</span>}
                         </div>
-                        <span className="font-mono text-[12px] text-on-surface-variant">@{u.username}</span>
+                        <span className="font-mono text-xs text-on-surface-variant">@{u.username}</span>
                         
                         {/* Assigned Aisles */}
                         <div className="flex flex-wrap gap-1.5 mt-2">
@@ -333,13 +333,13 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                             u.assignedAisles.map((num: number) => (
                               <span 
                                 key={num} 
-                                className="px-2 py-0.5 bg-primary/5 text-primary border border-primary/10 rounded-md font-sans text-[11px] font-medium"
+                                className="px-2 py-0.5 bg-primary/5 text-primary border border-primary/10 rounded-md font-sans text-xs font-medium"
                               >
                                 Pasillo {num}
                               </span>
                             ))
                           ) : (
-                            <span className="font-sans text-[11px] text-on-surface-variant/50 italic">Sin pasillos asignados</span>
+                            <span className="font-sans text-xs text-on-surface-variant/50 italic">Sin pasillos asignados</span>
                           )}
                         </div>
                       </div>
@@ -356,7 +356,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                           setUserAisles(u.assignedAisles || []);
                           setShowUserModal(true);
                         }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-all font-sans text-[12px] font-semibold cursor-pointer border border-transparent hover:border-primary/20"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-all font-sans text-xs font-semibold cursor-pointer border border-transparent hover:border-primary/20"
                         title="Editar Usuario"
                       >
                         <Edit size={14} />
@@ -364,7 +364,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                       </button>
                       <button
                         onClick={() => handleDeleteUserClick(u.id, u.username)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-on-surface-variant hover:bg-error/10 hover:text-error transition-all font-sans text-[12px] font-semibold cursor-pointer border border-transparent hover:border-error/20"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-on-surface-variant hover:bg-error/10 hover:text-error transition-all font-sans text-xs font-semibold cursor-pointer border border-transparent hover:border-error/20"
                         title="Eliminar Usuario"
                       >
                         <Trash2 size={14} />
@@ -402,7 +402,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
               <button
                 onClick={handleSeedDatabase}
                 disabled={dbActionLoading}
-                className="flex-1 bg-primary text-white hover:bg-primary/95 rounded-full py-3.5 font-sans text-[14px] font-semibold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                className="flex-1 bg-primary-container text-on-primary hover:bg-primary/95 rounded-2xl min-h-12 font-sans text-[14px] font-semibold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
               >
                 <Database size={16} />
                 {dbActionLoading ? 'Cargando...' : 'Restablecer Mocks'}
@@ -433,7 +433,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                 </div>
                 <div>
                   <span className="font-sans text-[13px] font-semibold block text-on-surface">Base de datos de SKUs</span>
-                  <span className="font-mono text-[11px] text-on-surface-variant">Sincronizada</span>
+                  <span className="font-mono text-xs text-on-surface-variant">Sincronizada</span>
                 </div>
               </div>
 
@@ -443,7 +443,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                 </div>
                 <div>
                   <span className="font-sans text-[13px] font-semibold block text-on-surface">Última Compilación</span>
-                  <span className="font-mono text-[11px] text-on-surface-variant">Hace 2 horas (v2.1)</span>
+                  <span className="font-mono text-xs text-on-surface-variant">Hace 2 horas (v2.1)</span>
                 </div>
               </div>
             </div>
@@ -451,7 +451,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
             <button 
               onClick={triggerSync}
               disabled={syncing}
-              className="mt-6 w-full bg-primary text-white rounded-full py-3 font-sans text-[14px] font-semibold shadow-sm flex items-center justify-center gap-2 hover:scale-[0.98] active:scale-95 transition-transform cursor-pointer"
+              className="mt-6 w-full bg-primary-container text-on-primary rounded-2xl min-h-12 font-sans text-[14px] font-semibold shadow-sm flex items-center justify-center gap-2 hover:scale-[0.98] active:scale-95 transition-transform cursor-pointer"
             >
               <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
               {syncing ? 'Sincronizando...' : 'Forzar Sincronización'}
@@ -471,7 +471,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                 { label: 'Motor AI', value: 'Gemini-Flash-3.5-Saman' },
               ].map(({ label, value }) => (
                 <div key={label} className="bg-white/50 rounded-2xl p-3 border border-outline-variant/20">
-                  <span className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider block mb-0.5">{label}</span>
+                  <span className="font-sans font-semibold text-xs text-on-surface-variant block mb-0.5">{label}</span>
                   <span className="font-sans text-[13px] font-semibold text-on-surface break-words">{value}</span>
                 </div>
               ))}
@@ -483,8 +483,8 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
 
       {/* User Creation / Edit Modal */}
       {showUserModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowUserModal(false)}>
-          <div className="bg-card-surface rounded-[32px] w-full max-w-md max-h-[90vh] flex flex-col shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-inverse-surface/50 z-[70] flex items-end md:items-center justify-center md:p-4 animate-in fade-in duration-200" onClick={() => setShowUserModal(false)}>
+          <div className="bg-card-surface rounded-t-3xl md:rounded-[32px] w-full max-w-md max-h-[92dvh] flex flex-col shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in slide-in-from-bottom md:slide-in-from-bottom-0 md:zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center p-6 border-b border-outline-variant/20 flex-shrink-0">
               <h3 className="font-sans text-[20px] font-bold text-on-surface">
                 {editingUserId ? 'Editar Usuario' : 'Crear Nuevo Usuario'}
@@ -496,7 +496,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
 
             <form onSubmit={handleUserSubmit} className="p-6 flex flex-col gap-4 overflow-y-auto flex-grow">
               <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Nombre Completo</label>
+                <label className="font-sans font-semibold text-xs text-on-surface-variant ">Nombre Completo</label>
                 <input 
                   type="text" 
                   required
@@ -509,7 +509,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Usuario (Login)</label>
+                <label className="font-sans font-semibold text-xs text-on-surface-variant ">Usuario (Login)</label>
                 <input 
                   type="text" 
                   required
@@ -523,7 +523,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
 
               {!editingUserId && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Contraseña</label>
+                  <label className="font-sans font-semibold text-xs text-on-surface-variant ">Contraseña</label>
                   <input 
                     type="password" 
                     required
@@ -536,7 +536,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
               )}
 
               <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Rol</label>
+                <label className="font-sans font-semibold text-xs text-on-surface-variant ">Rol</label>
                 <select 
                   value={userRole}
                   onChange={(e) => setUserRole(e.target.value as any)}
@@ -549,7 +549,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Pasillos Asignados</label>
+                <label className="font-sans font-semibold text-xs text-on-surface-variant ">Pasillos Asignados</label>
                 <div className="w-full bg-white border border-outline-variant/50 rounded-2xl p-4 max-h-[120px] overflow-y-auto flex flex-col gap-2 shadow-sm">
                   {aisles.length === 0 ? (
                     <span className="font-sans text-[13px] text-on-surface-variant">No hay pasillos registrados</span>
@@ -578,7 +578,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                                   ? 'Cabezal' 
                                   : `Pasillo ${a.number}`}
                             </span>
-                            <span className="font-mono text-[11px] text-on-surface-variant mt-0.5">{a.name}</span>
+                            <span className="font-mono text-xs text-on-surface-variant mt-0.5">{a.name}</span>
                           </div>
                         </label>
                       );
@@ -597,7 +597,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all"
+                  className="flex-1 bg-primary-container text-on-primary hover:bg-primary/95 font-sans text-[14px] font-semibold min-h-12 rounded-2xl shadow-sm transition-all"
                 >
                   {editingUserId ? 'Guardar Cambios' : 'Crear Usuario'}
                 </button>
@@ -609,8 +609,8 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
 
       {/* Clear DB Confirmation Modal */}
       {showClearDbModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowClearDbModal(false)}>
-          <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-inverse-surface/50 z-[70] flex items-end md:items-center justify-center md:p-4 animate-in fade-in duration-200" onClick={() => setShowClearDbModal(false)}>
+          <div className="bg-card-surface rounded-t-3xl md:rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-y-auto max-h-[92dvh] border border-outline-variant/30 animate-in slide-in-from-bottom md:slide-in-from-bottom-0 md:zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 flex flex-col items-center text-center gap-4">
               <div className="w-14 h-14 rounded-full bg-error-container flex items-center justify-center">
                 <Trash2 size={26} className="text-error" />
@@ -645,8 +645,8 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
 
       {/* Delete User Confirmation Modal */}
       {userToDelete && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setUserToDelete(null)}>
-          <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-inverse-surface/50 z-[70] flex items-end md:items-center justify-center md:p-4 animate-in fade-in duration-200" onClick={() => setUserToDelete(null)}>
+          <div className="bg-card-surface rounded-t-3xl md:rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-y-auto max-h-[92dvh] border border-outline-variant/30 animate-in slide-in-from-bottom md:slide-in-from-bottom-0 md:zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 flex flex-col items-center text-center gap-4">
               <div className="w-14 h-14 rounded-full bg-error-container flex items-center justify-center">
                 <Trash2 size={26} className="text-error" />
@@ -657,7 +657,7 @@ export function ConfiguracionView({ aisles, users, setUsers, onNavigate, user }:
                   ¿Estás seguro de que deseas eliminar al usuario <strong>@{userToDelete.username}</strong> de la base de datos de perfiles?
                 </p>
                 {isFirebaseConfigured && (
-                  <p className="font-sans text-[12px] text-left text-on-tertiary-fixed-variant bg-tertiary-container/40 p-3 rounded-2xl border border-tertiary-fixed-dim/60 mt-3">
+                  <p className="font-sans text-xs text-left text-on-tertiary-fixed-variant bg-tertiary-container/40 p-3 rounded-2xl border border-tertiary-fixed-dim/60 mt-3">
                     <strong>Nota de Seguridad:</strong> Esto remueve el perfil de Firestore, pero su acceso en <strong>Firebase Auth</strong> permanecerá activo. Para eliminar sus credenciales de forma permanente, debes borrar el usuario en la Consola de Firebase (pestaña Authentication).
                   </p>
                 )}

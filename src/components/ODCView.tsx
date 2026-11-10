@@ -186,7 +186,7 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
             {canEdit && (
               <button
                 onClick={() => setShowAddModal(true)}
-                className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white hover:bg-primary/95 rounded-full font-sans text-[15px] font-semibold transition-all shadow-md cursor-pointer"
+                className="flex items-center justify-center gap-2 px-6 min-h-12 bg-primary-container text-on-primary hover:bg-primary/95 rounded-2xl font-sans text-[15px] font-semibold transition-all shadow-md cursor-pointer"
               >
                 <Plus size={18} />
                 Nueva Orden
@@ -199,11 +199,11 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
         <div className="bg-card-surface rounded-3xl p-5 sm:p-6 shadow-[0_4px_20px_rgba(40,28,25,0.05)] mb-6">
           <div className="flex flex-wrap justify-between items-start gap-3 mb-3">
             <div>
-              <span className="font-mono text-[11px] sm:text-[13px] opacity-70 uppercase tracking-wider">Gasto de la semana actual</span>
+              <span className="font-sans font-semibold text-xs sm:text-[13px] opacity-70 ">Gasto de la semana actual</span>
               <div className="font-sans text-[26px] sm:text-[32px] font-bold text-on-surface leading-tight">{formatMoney(currentWeekTotal)}</div>
             </div>
             <div className="text-right">
-              <span className="font-mono text-[11px] sm:text-[13px] opacity-70 uppercase tracking-wider">Tope semanal</span>
+              <span className="font-sans font-semibold text-xs sm:text-[13px] opacity-70 ">Tope semanal</span>
               {editingLimit ? (
                 <div className="flex items-center gap-1.5 mt-1">
                   <input
@@ -241,14 +241,14 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
           </div>
 
           <div className="flex justify-between items-center mt-2">
-            <span className="font-mono text-[12px] text-on-surface-variant">{pct.toFixed(0)}% del tope usado</span>
+            <span className="font-mono text-xs text-on-surface-variant">{pct.toFixed(0)}% del tope usado</span>
             {overLimit ? (
-              <span className="flex items-center gap-1 font-mono text-[12px] font-bold text-error">
+              <span className="flex items-center gap-1 font-mono text-xs font-bold text-error">
                 <AlertTriangle size={13} />
                 Excedido por {formatMoney(currentWeekTotal - weeklyLimit)}
               </span>
             ) : (
-              <span className="font-mono text-[12px] text-on-surface-variant">Restante: {formatMoney(weeklyLimit - currentWeekTotal)}</span>
+              <span className="font-mono text-xs text-on-surface-variant">Restante: {formatMoney(weeklyLimit - currentWeekTotal)}</span>
             )}
           </div>
         </div>
@@ -279,7 +279,7 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
                 <div key={weekKey} className="bg-card-surface rounded-3xl shadow-[0_4px_20px_rgba(40,28,25,0.05)] overflow-hidden">
                   <div className="flex flex-wrap justify-between items-center gap-2 px-5 sm:px-6 py-4 border-b border-outline-variant/10">
                     <h3 className="font-sans text-[15px] sm:text-[16px] font-bold text-on-surface capitalize">{formatWeekLabel(weekOrders[0].fecha)}</h3>
-                    <span className={`px-3 py-1 rounded-full font-mono text-[12px] font-bold ${weekOverLimit ? 'bg-error-container text-on-error-container' : 'bg-primary/10 text-primary'}`}>
+                    <span className={`px-3 py-1 rounded-full font-mono text-xs font-bold ${weekOverLimit ? 'bg-error-container text-on-error-container' : 'bg-primary/10 text-primary'}`}>
                       {formatMoney(weekTotal)} / {formatMoney(weeklyLimit)}
                     </span>
                   </div>
@@ -290,8 +290,8 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
                       return (
                         <div key={dayKey} className="px-5 sm:px-6 py-3">
                           <div className="flex justify-between items-center mb-2">
-                            <span className="font-mono text-[11.5px] text-on-surface-variant uppercase tracking-wider capitalize">{formatDayLabel(dayOrders[0].fecha)}</span>
-                            <span className="font-mono text-[12px] font-semibold text-on-surface">{formatMoney(dayTotal)}</span>
+                            <span className="font-sans font-semibold text-xs text-on-surface-variant capitalize">{formatDayLabel(dayOrders[0].fecha)}</span>
+                            <span className="font-mono text-xs font-semibold text-on-surface">{formatMoney(dayTotal)}</span>
                           </div>
                           <div className="flex flex-col gap-2">
                             {dayOrders.map(o => (
@@ -322,12 +322,12 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
                                         <div className="flex items-center gap-2">
                                           <span className={`font-sans text-[13.5px] font-semibold truncate block ${o.arrived ? 'text-on-surface/50 line-through' : 'text-on-surface'}`}>{o.empresa}</span>
                                           {o.arrived && (
-                                            <span className="bg-primary/10 text-primary text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">
+                                            <span className="bg-primary/10 text-primary text-xs font-sans font-semibold font-bold px-1.5 py-0.5 rounded-full flex-shrink-0">
                                               Llegó
                                             </span>
                                           )}
                                         </div>
-                                        <span className="font-mono text-[11px] text-on-surface-variant">{formatShortDate(o.fecha)} · N° {o.numeroOrden}</span>
+                                        <span className="font-mono text-xs text-on-surface-variant">{formatShortDate(o.fecha)} · N° {o.numeroOrden}</span>
                                       </div>
                                     </div>
                                     <span className={`font-mono text-[13.5px] font-bold flex-shrink-0 ${o.arrived ? 'text-on-surface/50' : 'text-on-surface'}`}>{formatMoney(o.monto)}</span>
@@ -405,8 +405,8 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
       </div>
 
       {showPrintModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print-hide" onClick={() => setShowPrintModal(false)}>
-          <div className="bg-card-surface rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-inverse-surface/50 z-[70] flex items-end md:items-center justify-center md:p-4 animate-in fade-in duration-200 print-hide" onClick={() => setShowPrintModal(false)}>
+          <div className="bg-card-surface rounded-t-3xl md:rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-y-auto max-h-[92dvh] border border-outline-variant/30 animate-in slide-in-from-bottom md:slide-in-from-bottom-0 md:zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center p-6 border-b border-outline-variant/20">
               <h3 className="font-sans text-[20px] font-bold text-on-surface flex items-center gap-2">
                 <Printer className="text-primary" size={20} />
@@ -418,7 +418,7 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
             </div>
             <div className="p-6 flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Semana a imprimir</label>
+                <label className="font-sans font-semibold text-xs text-on-surface-variant ">Semana a imprimir</label>
                 <select
                   value={printWeekKey}
                   onChange={(e) => setPrintWeekKey(e.target.value)}
@@ -432,7 +432,7 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Filtrar por estado de entrega</label>
+                <label className="font-sans font-semibold text-xs text-on-surface-variant ">Filtrar por estado de entrega</label>
                 <select
                   value={printFilter}
                   onChange={(e) => setPrintFilter(e.target.value as any)}
@@ -450,7 +450,7 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
                 <button
                   type="button"
                   onClick={() => { window.print(); setShowPrintModal(false); }}
-                  className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
+                  className="flex-1 bg-primary-container text-on-primary hover:bg-primary/95 font-sans text-[14px] font-semibold min-h-12 rounded-2xl shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Printer size={16} />
                   Imprimir
@@ -462,8 +462,8 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
       )}
 
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print-hide" onClick={() => setShowAddModal(false)}>
-          <div className="bg-card-surface rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-inverse-surface/50 z-[70] flex items-end md:items-center justify-center md:p-4 animate-in fade-in duration-200 print-hide" onClick={() => setShowAddModal(false)}>
+          <div className="bg-card-surface rounded-t-3xl md:rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-y-auto max-h-[92dvh] border border-outline-variant/30 animate-in slide-in-from-bottom md:slide-in-from-bottom-0 md:zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center p-6 border-b border-outline-variant/20">
               <h3 className="font-sans text-[20px] font-bold text-on-surface">Nueva Orden de Compra</h3>
               <button onClick={() => setShowAddModal(false)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-variant transition-colors cursor-pointer">
@@ -472,26 +472,26 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
             </div>
             <form onSubmit={handleAdd} className="p-6 flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Fecha</label>
+                <label className="font-sans font-semibold text-xs text-on-surface-variant ">Fecha</label>
                 <input type="date" required value={fecha} onChange={(e) => setFecha(e.target.value)} className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm" />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Empresa</label>
+                <label className="font-sans font-semibold text-xs text-on-surface-variant ">Empresa</label>
                 <input type="text" required autoFocus value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Ej. Distribuidora XYZ" className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm" />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Número de Orden</label>
+                <label className="font-sans font-semibold text-xs text-on-surface-variant ">Número de Orden</label>
                 <input type="text" required value={numeroOrden} onChange={(e) => setNumeroOrden(e.target.value)} placeholder="Ej. OC-0452" className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm" />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Monto ($)</label>
+                <label className="font-sans font-semibold text-xs text-on-surface-variant ">Monto ($)</label>
                 <input type="number" required step="0.01" min="0.01" value={monto} onChange={(e) => setMonto(e.target.value)} placeholder="0.00" className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm" />
               </div>
               <div className="flex gap-3 mt-2">
                 <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer">
                   Cancelar
                 </button>
-                <button type="submit" className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer">
+                <button type="submit" className="flex-1 bg-primary-container text-on-primary hover:bg-primary/95 font-sans text-[14px] font-semibold min-h-12 rounded-2xl shadow-sm transition-all cursor-pointer">
                   Registrar Orden
                 </button>
               </div>
@@ -501,8 +501,8 @@ export function ODCView({ purchaseOrders, weeklyLimit, onAddPurchaseOrder, onUpd
       )}
 
       {orderToDelete && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print-hide" onClick={() => setOrderToDelete(null)}>
-          <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-inverse-surface/50 z-[70] flex items-end md:items-center justify-center md:p-4 animate-in fade-in duration-200 print-hide" onClick={() => setOrderToDelete(null)}>
+          <div className="bg-card-surface rounded-t-3xl md:rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-y-auto max-h-[92dvh] border border-outline-variant/30 animate-in slide-in-from-bottom md:slide-in-from-bottom-0 md:zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 flex flex-col items-center text-center gap-4">
               <div className="w-14 h-14 rounded-full bg-error-container flex items-center justify-center">
                 <Trash2 size={26} className="text-error" />

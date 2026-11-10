@@ -226,9 +226,8 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
 
   const handleBulkArchive = async () => {
     if (onArchiveOldOrders && oldPendingOrdersCount > 0) {
-      if (window.confirm(`¿Deseas archivar los ${oldPendingOrdersCount} pedidos pendientes con más de 30 días? Se moverán a la pestaña "Archivadas / Histórico".`)) {
-        await onArchiveOldOrders(30);
-      }
+      // Sin diálogo: el aviso que aparece abajo permite deshacer
+      await onArchiveOldOrders(30);
     }
   };
 
@@ -493,38 +492,39 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/70" size={18} />
               <input
                 type="text"
-                placeholder="Buscar SKU o Producto..."
+                placeholder="Buscar SKU o producto…" aria-label="Buscar SKU o producto"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white border border-outline-variant/30 rounded-full py-2.5 pl-10 pr-4 font-sans text-[15px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm transition-all"
+                className="w-full bg-white border border-outline-variant/30 rounded-2xl min-h-12 pl-10 pr-4 font-sans text-base focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 transition-colors"
               />
             </div>
             <button
               onClick={() => setShowPrintModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-full font-mono text-[13px] font-medium hover:bg-primary/90 transition-colors shadow-sm whitespace-nowrap cursor-pointer"
+              aria-label="Imprimir"
+              className="flex items-center justify-center gap-2 min-w-12 min-h-12 px-3 md:px-5 bg-primary-container text-on-primary rounded-2xl font-sans text-sm font-bold active:scale-[0.97] transition-transform whitespace-nowrap cursor-pointer"
             >
-              <Printer size={18} />
-              Imprimir
+              <Printer size={20} />
+              <span className="hidden md:inline">Imprimir</span>
             </button>
           </div>
         </div>
 
         {/* Main Navigation Tabs */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6 border-b border-outline-variant/20 pb-4">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 mb-5 -mx-4 px-4 md:mx-0 md:px-0 overflow-x-auto pb-1">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setMainTab('pending')}
-              className={`px-4 py-2.5 rounded-2xl font-sans text-[14px] font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm ${
+              className={`px-4 min-h-11 shrink-0 whitespace-nowrap rounded-full font-sans text-sm font-bold transition-colors cursor-pointer flex items-center gap-2 ${
                 mainTab === 'pending'
-                  ? 'bg-primary text-white'
-                  : 'bg-white border border-outline-variant/30 text-on-surface-variant hover:bg-surface-variant/40'
+                  ? 'bg-primary-container text-on-primary'
+                  : 'bg-white border border-outline-variant text-on-surface-variant active:bg-surface-variant/40'
               }`}
             >
               <Clock size={16} />
               Pendientes Activos
               {orders.filter(o => !o.archived && !checkedOrders.has(o.id)).length > 0 && (
-                <span className={`px-2 py-0.5 rounded-full font-mono text-[11px] font-bold ${mainTab === 'pending' ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'}`}>
+                <span className={`px-2 py-0.5 rounded-full font-mono text-xs font-bold ${mainTab === 'pending' ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'}`}>
                   {orders.filter(o => !o.archived && !checkedOrders.has(o.id)).length}
                 </span>
               )}
@@ -533,10 +533,10 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
             <button
               type="button"
               onClick={() => setMainTab('7days')}
-              className={`px-4 py-2.5 rounded-2xl font-sans text-[14px] font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm ${
+              className={`px-4 min-h-11 shrink-0 whitespace-nowrap rounded-full font-sans text-sm font-bold transition-colors cursor-pointer flex items-center gap-2 ${
                 mainTab === '7days'
-                  ? 'bg-primary text-white'
-                  : 'bg-white border border-outline-variant/30 text-on-surface-variant hover:bg-surface-variant/40'
+                  ? 'bg-primary-container text-on-primary'
+                  : 'bg-white border border-outline-variant text-on-surface-variant active:bg-surface-variant/40'
               }`}
             >
               Últimos 7 días
@@ -545,10 +545,10 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
             <button
               type="button"
               onClick={() => setMainTab('30days')}
-              className={`px-4 py-2.5 rounded-2xl font-sans text-[14px] font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm ${
+              className={`px-4 min-h-11 shrink-0 whitespace-nowrap rounded-full font-sans text-sm font-bold transition-colors cursor-pointer flex items-center gap-2 ${
                 mainTab === '30days'
-                  ? 'bg-primary text-white'
-                  : 'bg-white border border-outline-variant/30 text-on-surface-variant hover:bg-surface-variant/40'
+                  ? 'bg-primary-container text-on-primary'
+                  : 'bg-white border border-outline-variant text-on-surface-variant active:bg-surface-variant/40'
               }`}
             >
               Últimos 30 días
@@ -558,14 +558,14 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
           <button
             type="button"
             onClick={() => setMainTab('archived')}
-            className={`px-4 py-2.5 rounded-2xl font-sans text-[14px] font-bold transition-all cursor-pointer flex items-center gap-2 shadow-sm ${
+            className={`px-4 min-h-11 shrink-0 whitespace-nowrap rounded-full font-sans text-sm font-bold transition-colors cursor-pointer flex items-center gap-2 ${
               mainTab === 'archived'
-                ? 'bg-primary text-white'
-                : 'bg-white border border-outline-variant/30 text-on-surface-variant hover:bg-surface-variant/40'
+                ? 'bg-primary-container text-on-primary'
+                : 'bg-white border border-outline-variant text-on-surface-variant active:bg-surface-variant/40'
             }`}
           >
             <Archive size={16} />
-            Archivadas / Histórico
+            Archivadas
           </button>
         </div>
 
@@ -632,7 +632,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                   <SlidersHorizontal size={16} />
                   Filtros
                   {activeFilterCount > 0 && (
-                    <span className="w-[18px] h-[18px] flex items-center justify-center bg-primary text-white rounded-full font-mono text-[10px] font-bold">
+                    <span className="w-[18px] h-[18px] flex items-center justify-center bg-primary-container text-on-primary rounded-2xl font-mono text-xs font-bold">
                       {activeFilterCount}
                     </span>
                   )}
@@ -659,7 +659,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                 <div className="bg-card-surface rounded-2xl p-4 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
                   {/* Pasillo Selector */}
                   <div>
-                    <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
+                    <label className="block font-sans font-semibold text-xs text-on-surface-variant mb-1.5 ml-1 font-bold">
                       Pasillo
                     </label>
                     <div className="relative">
@@ -686,7 +686,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
 
                   {/* Estado Selector */}
                   <div>
-                    <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
+                    <label className="block font-sans font-semibold text-xs text-on-surface-variant mb-1.5 ml-1 font-bold">
                       Estado de Stock
                     </label>
                     <div className="relative">
@@ -710,7 +710,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                   {/* Operador Selector (only if user is not Operator) */}
                   {!isOperator && (
                     <div>
-                      <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
+                      <label className="block font-sans font-semibold text-xs text-on-surface-variant mb-1.5 ml-1 font-bold">
                         Operador
                       </label>
                       <div className="relative">
@@ -739,7 +739,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
 
                   {/* Empresa Selector */}
                   <div>
-                    <label className="block font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mb-1.5 ml-1 font-bold">
+                    <label className="block font-sans font-semibold text-xs text-on-surface-variant mb-1.5 ml-1 font-bold">
                       Empresa
                     </label>
                     <div className="relative">
@@ -803,11 +803,11 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                     </div>
                     <div className="text-left">
                       <div className="flex items-center gap-2">
-                        <span className={`font-sans text-[16px] font-bold capitalize ${isToday ? 'text-primary' : 'text-on-surface'}`}>
+                        <span className={`font-sans text-[16px] font-bold block first-letter:uppercase ${isToday ? 'text-primary' : 'text-on-surface'}`}>
                           {label}
                         </span>
                         {isToday && (
-                          <span className="px-2 py-0.5 bg-primary/10 text-primary font-mono text-[10px] font-bold uppercase tracking-wider rounded-full border border-primary/20">
+                          <span className="px-2 py-0.5 bg-primary/10 text-primary font-sans font-semibold text-xs font-bold rounded-full border border-primary/20">
                             Activo
                           </span>
                         )}
@@ -834,7 +834,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                       return (
                         <div
                           key={order.id}
-                          className={`flex items-center gap-3 px-6 py-4 border-b border-outline-variant/10 last:border-b-0 transition-colors ${
+                          className={`flex items-start md:items-center gap-3 px-3 sm:px-6 py-3.5 border-b border-outline-variant/10 last:border-b-0 transition-colors ${
                             isChecked ? 'bg-primary/5 opacity-60' : 'hover:bg-surface-variant/20'
                           }`}
                         >
@@ -855,13 +855,13 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                           {editingOrderId === order.id ? (
                             <div className="flex-1 flex flex-col gap-2 min-w-0 py-1" onClick={(e) => e.stopPropagation()}>
                               {/* Row 1: Product Name input */}
-                              <div className="flex items-center gap-2 w-full">
-                                <span className="font-sans text-[13px] font-medium text-on-surface-variant whitespace-nowrap">Nombre:</span>
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full">
+                                <span className="font-sans text-sm font-semibold text-on-surface-variant whitespace-nowrap">Nombre</span>
                                 <input
                                   type="text"
                                   value={tempProductName}
                                   onChange={(e) => setTempProductName(e.target.value)}
-                                  className="flex-1 min-w-[150px] px-2.5 py-1 border border-primary rounded-xl font-sans text-[14px] focus:outline-none focus:ring-1 focus:ring-primary bg-white shadow-sm"
+                                  className="flex-1 min-w-0 min-h-12 px-3 border border-primary rounded-xl font-sans text-base focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
                                   autoFocus
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') handleSaveInlineEdit(order.id);
@@ -870,47 +870,46 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                                 />
                               </div>
                               {/* Row 2: Box Qty and Company inputs + Action buttons */}
-                              <div className="flex items-center gap-3 flex-wrap">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-sans text-[13px] font-medium text-on-surface-variant">Caja:</span>
+                              <div className="grid grid-cols-2 sm:flex sm:items-end gap-3">
+                                <div className="flex flex-col gap-1">
+                                  <span className="font-sans text-sm font-semibold text-on-surface-variant">Caja (und)</span>
                                   <input
                                     type="number"
                                     min="0"
                                     value={tempUndXCaja}
                                     onChange={(e) => setTempUndXCaja(e.target.value)}
-                                    className="w-16 px-1.5 py-0.5 border border-primary rounded-xl font-mono text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-white shadow-sm"
+                                    inputMode="numeric" className="w-full sm:w-24 min-h-12 px-3 border border-primary rounded-xl font-sans text-base focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white tabular"
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') handleSaveInlineEdit(order.id);
                                       else if (e.key === 'Escape') setEditingOrderId(null);
                                     }}
                                   />
-                                  <span className="font-mono text-[12px] text-on-surface-variant">und</span>
                                 </div>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-sans text-[13px] font-medium text-on-surface-variant">Empresa:</span>
+                                <div className="flex flex-col gap-1">
+                                  <span className="font-sans text-sm font-semibold text-on-surface-variant">Empresa</span>
                                   <input
                                     type="text"
                                     list="companies-list"
                                     value={tempCompany}
                                     onChange={(e) => setTempCompany(e.target.value)}
                                     placeholder="Empresa"
-                                    className="w-32 px-1.5 py-0.5 border border-primary rounded-xl font-sans text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-white shadow-sm"
+                                    className="w-full sm:w-44 min-h-12 px-3 border border-primary rounded-xl font-sans text-base focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') handleSaveInlineEdit(order.id);
                                       else if (e.key === 'Escape') setEditingOrderId(null);
                                     }}
                                   />
                                 </div>
-                                <div className="flex items-center gap-2 ml-auto">
+                                <div className="col-span-2 sm:col-span-1 flex items-center gap-2 sm:ml-auto">
                                   <button
                                     onClick={() => handleSaveInlineEdit(order.id)}
-                                    className="px-3 py-1 bg-primary text-white rounded-full font-sans text-[12px] font-semibold hover:bg-primary/95 cursor-pointer shadow-sm animate-in fade-in zoom-in duration-200"
+                                    className="flex-1 sm:flex-none min-h-12 px-5 bg-primary-container text-on-primary rounded-xl font-sans text-base font-bold cursor-pointer"
                                   >
                                     Guardar
                                   </button>
                                   <button
                                     onClick={() => setEditingOrderId(null)}
-                                    className="px-3 py-1 bg-white border border-outline-variant/50 text-on-surface-variant rounded-full font-sans text-[12px] font-semibold hover:bg-surface-variant/50 cursor-pointer shadow-sm animate-in fade-in zoom-in duration-200"
+                                    className="flex-1 sm:flex-none min-h-12 px-5 bg-white border border-outline text-on-surface rounded-xl font-sans text-base font-bold cursor-pointer"
                                   >
                                     Cancelar
                                   </button>
@@ -919,12 +918,12 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                             </div>
                           ) : (
                             <div
-                              className="flex-1 flex items-center justify-between gap-4 cursor-pointer min-w-0"
+                              className="flex-1 flex flex-col md:flex-row md:items-center md:justify-between gap-1.5 md:gap-4 cursor-pointer min-w-0"
                               onClick={() => setSelectedOrder(order)}
                             >
                               <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <p className={`font-sans text-[15px] font-semibold ${isChecked ? 'line-through text-on-surface-variant' : 'text-on-surface'}`}>
+                                <div className="flex items-start gap-1">
+                                  <p className={`font-sans text-base font-semibold leading-snug ${isChecked ? 'line-through text-on-surface-variant' : 'text-on-surface'}`}>
                                     {order.productName}
                                   </p>
                                   {!isChecked && (
@@ -933,41 +932,42 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                                         e.stopPropagation();
                                         handleStartInlineEdit(order);
                                       }}
-                                      className="text-primary hover:text-primary/70 transition-colors p-0.5 inline-flex items-center cursor-pointer"
+                                      className="text-primary-container active:bg-primary/10 transition-colors w-10 h-10 -my-2 inline-flex items-center justify-center rounded-full shrink-0 cursor-pointer"
                                       title="Editar producto"
+                                      aria-label="Editar producto"
                                     >
-                                      <Pencil size={13} />
+                                      <Pencil size={16} />
                                     </button>
                                   )}
                                 </div>
-                                <p className="font-mono text-[12px] text-on-surface-variant">
+                                <p className="font-sans text-sm text-on-surface-variant">
                                   {order.brand} · SKU {order.sku} · Pasillo {order.aisle} {order.und_x_caja !== undefined && order.und_x_caja > 0 ? ` · Caja: ${order.und_x_caja} und` : ''} {order.company ? ` · ${order.company}` : ''}
                                 </p>
                               </div>
 
-                              <div className="flex items-center gap-3 flex-shrink-0">
-                                <span className="font-sans text-[15px] font-bold text-on-surface whitespace-nowrap">
+                              <div className="flex items-center gap-2 flex-wrap md:flex-nowrap md:gap-3 md:flex-shrink-0">
+                                <span className="font-sans text-base font-bold text-on-surface whitespace-nowrap tabular">
                                   {order.suggestedQty} {order.unit || 'und'}
                                 </span>
 
                                 {!isChecked && !order.archived && isOlderThan30Days(order.lastUpdated) && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/15 text-amber-900 rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-amber-500/30 whitespace-nowrap" title="Solicitud creada hace más de 30 días">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/15 text-amber-900 rounded-full font-sans font-semibold text-xs font-bold border border-amber-500/30 whitespace-nowrap" title="Solicitud creada hace más de 30 días">
                                     <Clock size={11} /> +30d
                                   </span>
                                 )}
 
                                 {order.archived && (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-surface-variant text-on-surface-variant rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-outline-variant/40 whitespace-nowrap">
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-surface-variant text-on-surface-variant rounded-full font-sans font-semibold text-xs font-bold border border-outline-variant/40 whitespace-nowrap">
                                     <Archive size={11} /> Archivado
                                   </span>
                                 )}
 
                                 {isChecked
-                                  ? <span className="inline-flex px-2.5 py-1 bg-primary/10 text-primary rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-primary/20 whitespace-nowrap">Pedido ✓</span>
+                                  ? <span className="inline-flex px-2.5 py-1 bg-primary/10 text-primary rounded-full font-sans font-semibold text-xs font-bold border border-primary/20 whitespace-nowrap">Pedido ✓</span>
                                   : <>
-                                    {order.status === 'crítico' && <span className="inline-flex px-2.5 py-1 bg-error-container text-on-error-container rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-error/20 whitespace-nowrap">Crítico</span>}
-                                    {order.status === 'bajo' && <span className="inline-flex px-2.5 py-1 bg-tertiary-container/40 text-on-tertiary-fixed-variant rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-tertiary-fixed-dim/60 whitespace-nowrap">Bajo</span>}
-                                    {order.status === 'normal' && <span className="inline-flex px-2.5 py-1 bg-primary/10 text-primary rounded-full font-mono text-[10px] font-bold uppercase tracking-wider border border-primary/20 whitespace-nowrap">Normal</span>}
+                                    {order.status === 'crítico' && <span className="inline-flex px-2.5 py-1 bg-error-container text-on-error-container rounded-full font-sans font-semibold text-xs font-bold border border-error/20 whitespace-nowrap">Crítico</span>}
+                                    {order.status === 'bajo' && <span className="inline-flex px-2.5 py-1 bg-tertiary-container/40 text-on-tertiary-fixed-variant rounded-full font-sans font-semibold text-xs font-bold border border-tertiary-fixed-dim/60 whitespace-nowrap">Bajo</span>}
+                                    {order.status === 'normal' && <span className="inline-flex px-2.5 py-1 bg-primary/10 text-primary rounded-full font-sans font-semibold text-xs font-bold border border-primary/20 whitespace-nowrap">Normal</span>}
                                   </>
                                 }
 
@@ -978,7 +978,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                                       e.stopPropagation();
                                       onArchiveOrder(order.id, !order.archived);
                                     }}
-                                    className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 font-mono text-[11px] font-semibold ${
+                                    className={`min-w-11 min-h-11 -my-1.5 ml-auto md:ml-0 justify-center rounded-xl transition-colors cursor-pointer flex items-center gap-1 font-sans text-sm font-semibold ${
                                       order.archived
                                         ? 'text-primary hover:bg-primary/10'
                                         : 'text-on-surface-variant hover:text-error hover:bg-error/10'
@@ -999,7 +999,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                                   </button>
                                 )}
 
-                                <span className="font-mono text-[12px] text-on-surface-variant/60 hidden sm:block">
+                                <span className="font-sans text-xs text-on-surface-variant hidden sm:block tabular">
                                   {formatTime(order.lastUpdated)}
                                 </span>
                               </div>
@@ -1025,7 +1025,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
 
               {/* Items per page selector */}
               <div className="flex items-center gap-1 bg-surface-variant/30 p-1 rounded-xl border border-outline-variant/20">
-                <span className="font-mono text-[11px] text-on-surface-variant px-1.5 font-bold uppercase">Por página:</span>
+                <span className="font-sans font-semibold text-xs text-on-surface-variant px-1.5 font-bold ">Por página:</span>
                 {[50, 100, 200, 0].map(val => (
                   <button
                     key={val}
@@ -1034,7 +1034,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                       setItemsPerPage(val);
                       setCurrentPage(1);
                     }}
-                    className={`px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg font-mono text-xs font-bold transition-all cursor-pointer ${
                       itemsPerPage === val
                         ? 'bg-primary text-white shadow-sm'
                         : 'text-on-surface-variant hover:text-on-surface'
@@ -1065,7 +1065,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                       const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
                       return (
                         <span key={p} className="flex items-center gap-1">
-                          {showEllipsis && <span className="font-mono text-[12px] text-on-surface-variant px-1">...</span>}
+                          {showEllipsis && <span className="font-mono text-xs text-on-surface-variant px-1">...</span>}
                           <button
                             type="button"
                             onClick={() => setCurrentPage(p)}
@@ -1105,7 +1105,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
             <div className="w-9 h-9 rounded-md bg-black text-white flex items-center justify-center font-bold text-sm flex-shrink-0">SS</div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Súper Samán — Sucursal Calle Principal</h1>
-              <p className="text-sm text-gray-600 mt-0.5 uppercase font-mono">Reporte de Fallas y Pedidos de Abastecimiento</p>
+              <p className="text-sm text-gray-600 mt-0.5 font-sans font-semibold">Reporte de Fallas y Pedidos de Abastecimiento</p>
             </div>
           </div>
           <div className="text-right font-mono text-sm">
@@ -1182,7 +1182,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                           <td className="py-3.5 text-sm font-mono border-b border-gray-200">{item.sku || '-'}</td>
                           {printGroupBy !== 'aisle' && <td className="py-3.5 text-sm border-b border-gray-200">Pasillo {item.aisle}</td>}
                           <td className="py-3.5 text-sm font-bold text-right border-b border-gray-200">{item.suggestedQty} {item.unit || 'und'}</td>
-                          <td className="py-3.5 text-sm font-mono uppercase border-b border-gray-200">
+                          <td className="py-3.5 text-sm font-sans font-semibold border-b border-gray-200">
                             <span className={
                               item.status === 'crítico' ? 'text-error font-bold' :
                               item.status === 'bajo' ? 'text-on-tertiary-fixed-variant font-semibold' : 'text-gray-700'
@@ -1213,8 +1213,8 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
 
       {/* Detail Modal */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print-hide" onClick={() => { setSelectedOrder(null); setIsEditing(false); }}>
-          <div className="bg-card-surface rounded-[32px] w-full max-w-lg shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-inverse-surface/50 z-[70] flex items-end md:items-center justify-center md:p-4 animate-in fade-in duration-200 print-hide" onClick={() => { setSelectedOrder(null); setIsEditing(false); }}>
+          <div className="bg-card-surface rounded-t-3xl md:rounded-[32px] w-full max-w-lg shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in slide-in-from-bottom md:slide-in-from-bottom-0 md:zoom-in-95 duration-200 flex flex-col max-h-[92dvh]" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center p-6 border-b border-outline-variant/20 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <h3 className="font-sans text-[20px] font-bold text-on-surface">
@@ -1239,7 +1239,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
               {isEditing ? (
                 <>
                   <div className="flex flex-col gap-1.5">
-                    <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Nombre del Producto</label>
+                    <label className="font-sans font-semibold text-xs text-on-surface-variant ">Nombre del Producto</label>
                     <input 
                       type="text" 
                       required
@@ -1251,7 +1251,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Unidades por Caja</label>
+                    <label className="font-sans font-semibold text-xs text-on-surface-variant ">Unidades por Caja</label>
                     <input 
                       type="number" 
                       min="0"
@@ -1263,7 +1263,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Empresa / Distribuidor</label>
+                    <label className="font-sans font-semibold text-xs text-on-surface-variant ">Empresa / Distribuidor</label>
                     <input 
                       type="text" 
                       list="companies-list"
@@ -1277,49 +1277,49 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
               ) : (
                 <>
                   <div className="flex flex-col">
-                    <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Producto</span>
+                    <span className="font-sans font-semibold text-xs text-on-surface-variant ">Producto</span>
                     <span className="font-sans text-[18px] font-bold text-on-surface leading-tight mt-0.5">{selectedOrder.productName}</span>
                     <span className="font-mono text-[13px] text-on-surface-variant mt-0.5">{selectedOrder.brand}</span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 border-t border-b border-outline-variant/15 py-4 my-2">
                     <div>
-                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">SKU</span>
+                      <span className="font-sans font-semibold text-xs text-on-surface-variant block">SKU</span>
                       <span className="font-mono text-[14px] font-semibold text-on-surface">{selectedOrder.sku}</span>
                     </div>
                     <div>
-                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Cantidad Sugerida</span>
+                      <span className="font-sans font-semibold text-xs text-on-surface-variant block">Cantidad Sugerida</span>
                       <span className="font-sans text-[16px] font-bold text-primary">{selectedOrder.suggestedQty} {selectedOrder.unit || 'und'}</span>
                     </div>
                     <div>
-                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Ubicación</span>
+                      <span className="font-sans font-semibold text-xs text-on-surface-variant block">Ubicación</span>
                       <span className="font-sans text-[14px] text-on-surface">Pasillo {selectedOrder.aisle}</span>
                     </div>
                     <div>
-                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Solicitado Por</span>
+                      <span className="font-sans font-semibold text-xs text-on-surface-variant block">Solicitado Por</span>
                       <span className="font-sans text-[14px] text-on-surface">{selectedOrder.user}</span>
                     </div>
                     <div>
-                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Cantidad por Caja</span>
+                      <span className="font-sans font-semibold text-xs text-on-surface-variant block">Cantidad por Caja</span>
                       <span className="font-sans text-[14px] font-semibold text-on-surface">{selectedOrder.und_x_caja ?? 0} und</span>
                     </div>
                     <div>
-                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Empresa / Distribuidor</span>
+                      <span className="font-sans font-semibold text-xs text-on-surface-variant block">Empresa / Distribuidor</span>
                       <span className="font-sans text-[14px] font-semibold text-on-surface">{selectedOrder.company || 'Sin especificar'}</span>
                     </div>
                   </div>
 
                   <div className="flex justify-between items-center">
                     <div className="flex flex-col">
-                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Estado</span>
+                      <span className="font-sans font-semibold text-xs text-on-surface-variant ">Estado</span>
                       <div className="mt-1">
-                        {selectedOrder.status === 'crítico' && <span className="inline-flex px-3 py-1 bg-error-container text-on-error-container rounded-full font-mono text-[11px] font-bold uppercase tracking-wider border border-error/20">Crítico</span>}
-                        {selectedOrder.status === 'bajo' && <span className="inline-flex px-3 py-1 bg-tertiary-container/40 text-on-tertiary-fixed-variant rounded-full font-mono text-[11px] font-bold uppercase tracking-wider border border-tertiary-fixed-dim/60">Stock Bajo</span>}
-                        {selectedOrder.status === 'normal' && <span className="inline-flex px-3 py-1 bg-primary/10 text-primary rounded-full font-mono text-[11px] font-bold uppercase tracking-wider border border-primary/20">Normal</span>}
+                        {selectedOrder.status === 'crítico' && <span className="inline-flex px-3 py-1 bg-error-container text-on-error-container rounded-full font-sans font-semibold text-xs font-bold border border-error/20">Crítico</span>}
+                        {selectedOrder.status === 'bajo' && <span className="inline-flex px-3 py-1 bg-tertiary-container/40 text-on-tertiary-fixed-variant rounded-full font-sans font-semibold text-xs font-bold border border-tertiary-fixed-dim/60">Stock Bajo</span>}
+                        {selectedOrder.status === 'normal' && <span className="inline-flex px-3 py-1 bg-primary/10 text-primary rounded-full font-sans font-semibold text-xs font-bold border border-primary/20">Normal</span>}
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block">Enviado</span>
+                      <span className="font-sans font-semibold text-xs text-on-surface-variant block">Enviado</span>
                       <span className="font-mono text-[13px] text-on-surface-variant">
                         {formatDayLabel(selectedOrder.lastUpdated)} {formatTime(selectedOrder.lastUpdated)}
                       </span>
@@ -1337,7 +1337,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                   </button>
                   <button
                     onClick={() => handleSaveEdit()}
-                    className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3 rounded-full shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    className="flex-1 bg-primary-container text-on-primary hover:bg-primary/95 font-sans text-[14px] font-semibold min-h-12 rounded-2xl shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
                   >
                     Guardar
                   </button>
@@ -1349,7 +1349,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                   </button>
                   <button
                     onClick={() => { setSelectedOrder(null); onNavigate('pasillo-detail', selectedOrder.aisle); }}
-                    className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3 rounded-full shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    className="flex-1 bg-primary-container text-on-primary hover:bg-primary/95 font-sans text-[14px] font-semibold min-h-12 rounded-2xl shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
                   >
                     <Store size={16} />
                     Ir al Pasillo
@@ -1363,8 +1363,8 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
 
       {/* Print Config Modal */}
       {showPrintModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print-hide" onClick={() => setShowPrintModal(false)}>
-          <div className="bg-card-surface rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-inverse-surface/50 z-[70] flex items-end md:items-center justify-center md:p-4 animate-in fade-in duration-200 print-hide" onClick={() => setShowPrintModal(false)}>
+          <div className="bg-card-surface rounded-t-3xl md:rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in slide-in-from-bottom md:slide-in-from-bottom-0 md:zoom-in-95 duration-200 flex flex-col max-h-[92dvh]" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center p-6 border-b border-outline-variant/20 flex-shrink-0">
               <h3 className="font-sans text-[18px] font-bold text-on-surface flex items-center gap-2">
                 <Printer className="text-primary" size={20} />
@@ -1378,7 +1378,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
             <div className="p-6 flex flex-col gap-5 overflow-y-auto flex-1">
               {/* Group By Options */}
               <div>
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block mb-2 font-semibold">
+                <label className="font-sans font-semibold text-xs text-on-surface-variant block mb-2 font-semibold">
                   Agrupar fallas por:
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1405,7 +1405,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
 
               {/* Status Filter Options */}
               <div>
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block mb-2 font-semibold">
+                <label className="font-sans font-semibold text-xs text-on-surface-variant block mb-2 font-semibold">
                   Nivel de Stock (Filtro):
                 </label>
                 <div className="flex flex-col gap-2">
@@ -1432,7 +1432,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
 
               {/* Order Scope Filter Options */}
               <div>
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block mb-2 font-semibold">
+                <label className="font-sans font-semibold text-xs text-on-surface-variant block mb-2 font-semibold">
                   Estado de pedido:
                 </label>
                 <div className="flex flex-col gap-2">
@@ -1472,7 +1472,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
                     setShowPrintModal(false);
                   }, 250);
                 }}
-                className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3 rounded-full shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="flex-1 bg-primary-container text-on-primary hover:bg-primary/95 font-sans text-[14px] font-semibold min-h-12 rounded-2xl shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
                 <Printer size={16} />
                 Confirmar e Imprimir
@@ -1484,7 +1484,7 @@ export function ComprasView({ orders, onNavigate, aisles, checkedOrders, toggleC
       {showScrollTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-[84px] md:bottom-8 right-6 md:right-8 bg-primary text-white p-3.5 rounded-full shadow-[0_8px_30px_rgba(62,158,87,0.3)] hover:bg-primary/95 hover:scale-105 active:scale-95 transition-all duration-300 z-40 cursor-pointer print:hidden animate-in fade-in slide-in-from-bottom-4 flex items-center justify-center transform-gpu"
+          className="fixed bottom-[84px] md:bottom-8 right-6 md:right-8 bg-primary-container text-on-primary p-3.5 rounded-2xl shadow-[0_8px_30px_rgba(62,158,87,0.3)] hover:bg-primary/95 hover:scale-105 active:scale-95 transition-all duration-300 z-40 cursor-pointer print:hidden animate-in fade-in slide-in-from-bottom-4 flex items-center justify-center transform-gpu"
           title="Subir al inicio"
         >
           <ArrowUp size={22} strokeWidth={2.5} />

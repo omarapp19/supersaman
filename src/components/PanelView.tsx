@@ -1,4 +1,5 @@
-import { ShoppingCart, CheckCircle2, TrendingUp, Repeat2 } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronRight, ArrowRight } from 'lucide-react';
 import { ViewState, Aisle, OrderItem } from '../types';
 
 interface PanelViewProps {
@@ -8,17 +9,17 @@ interface PanelViewProps {
   checkedOrders: Set<string>;
 }
 
+type AisleFilter = 'todos' | 'critico' | 'stock' | 'vacio';
+
 export function PanelView({ onNavigate, aisles, orders, checkedOrders }: PanelViewProps) {
-  // Metric 1: Total suggested orders pending (not yet checked)
+  const [filter, setFilter] = useState<AisleFilter | null>(null);
+
+  // Sugeridos pendientes (sin marcar como pedidos)
   const totalSugeridos = orders.length;
   const pendingSugeridos = orders.filter(o => !checkedOrders.has(o.id)).length;
-
-  // Metric 2: Already ordered (checked)
   const confirmedCount = checkedOrders.size;
 
-  // Metric 3: Top rotating products
-  // A product "rotates" when it's been in orders multiple times AND has been marked as received (checked)
-  // Count frequency for each product in the full orders list
+  // Productos de alta rotación: más confirmados primero, luego más repetidos
   const productFreq: Record<string, { name: string; brand: string; total: number; confirmed: number }> = {};
   orders.forEach(order => {
     const key = order.productName + '|' + order.brand;
@@ -30,176 +31,142 @@ export function PanelView({ onNavigate, aisles, orders, checkedOrders }: PanelVi
       productFreq[key].confirmed += 1;
     }
   });
-
-  // Sort: first by confirmed count (most confirmed = highest rotation), then by total
   const topProducts = Object.values(productFreq)
     .filter(p => p.total > 0)
     .sort((a, b) => b.confirmed - a.confirmed || b.total - a.total)
     .slice(0, 5);
 
-  // Aisles with a pending (unchecked) crítico order get flagged for the "Estado de Pasillos" grid
+  // Pasillos con un sugerido crítico pendiente
   const criticalAisles = new Set(
     orders.filter(o => o.status === 'crítico' && !checkedOrders.has(o.id)).map(o => o.aisle)
   );
 
+  const statusOf = (a: Aisle): 'critico' | 'stock' | 'vacio' =>
+    criticalAisles.has(a.number) ? 'critico' : (a.productsCount || 0) > 0 ? 'stock' : 'vacio';
+
+  const counts = { critico: 0, stock: 0, vacio: 0 };
+  aisles.forEach(a => { counts[statusOf(a)] += 1; });
+
+  // Por defecto, lo que necesita atención primero
+  const activeFilter: AisleFilter = filter ?? (counts.critico > 0 ? 'critico' : 'todos');
+  const order = { critico: 0, stock: 1, vacio: 2 };
+  const visibleAisles = aisles
+    .filter(a => activeFilter === 'todos' || statusOf(a) === activeFilter)
+    .sort((x, y) => order[statusOf(x)] - order[statusOf(y)] || x.number - y.number);
+
+  const pct = Math.round((confirmedCount / Math.max(totalSugeridos, 1)) * 100);
+  const chips: { id: AisleFilter; label: string; n: number; dot?: string }[] = [
+    { id: 'todos', label: 'Todos', n: aisles.length },
+    { id: 'critico', label: 'Crítico', n: counts.critico, dot: 'bg-error' },
+    { id: 'stock', label: 'Con stock', n: counts.stock, dot: 'bg-primary' },
+    { id: 'vacio', label: 'Vacío', n: counts.vacio, dot: 'bg-tertiary' },
+  ];
+  const dotOf = { critico: 'bg-error', stock: 'bg-primary', vacio: 'bg-tertiary' };
+  const labelOf = { critico: 'Crítico', stock: 'Con stock', vacio: 'Vacío' };
+
   return (
-    <div className="w-full h-full mx-auto pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <header className="mb-6 sm:mb-8">
-        <h2 className="font-sans text-[26px] sm:text-[32px] md:text-[48px] font-bold text-on-surface leading-tight tracking-tight">Vista General del Panel</h2>
-        <p className="font-sans text-[14px] sm:text-[16px] md:text-[18px] text-on-surface-variant mt-1 sm:mt-2">Métricas de Rendimiento de Sucursal Calle Principal.</p>
+    <div className="w-full mx-auto pb-12 animate-in fade-in duration-300">
+      <header className="mb-4">
+        <h2 className="font-sans text-[26px] md:text-[36px] font-bold text-on-surface leading-tight">Panel</h2>
+        <p className="font-sans text-sm md:text-base text-on-surface-variant">Resumen de la sucursal</p>
       </header>
 
-      {/* Top Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-5 mb-3 sm:mb-5">
-
-        {/* Card 1: Sugeridos Activos */}
-        <div className="bg-card-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-[0_4px_20px_rgba(40,28,25,0.05)] flex flex-col justify-between min-h-[130px] sm:min-h-[160px] relative overflow-hidden group cursor-pointer" onClick={() => onNavigate('compras')}>
-          <div className="absolute -right-4 -bottom-4 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity pointer-events-none">
-            <ShoppingCart size={100} className="sm:hidden" />
-            <ShoppingCart size={140} className="hidden sm:block" />
-          </div>
-          <div className="flex justify-between items-start relative z-10">
-            <span className="font-mono text-[10.5px] sm:text-[13px] opacity-70 uppercase tracking-wider">Sugeridos Activos</span>
-            <div className="bg-primary-container text-on-primary-container rounded-full p-1.5 sm:p-2 flex-shrink-0">
-              <ShoppingCart size={16} className="sm:hidden" />
-              <ShoppingCart size={20} className="hidden sm:block" />
-            </div>
-          </div>
-          <div className="relative z-10 mt-3 sm:mt-4">
-            <div className="font-sans text-[26px] sm:text-[40px] md:text-[48px] font-bold text-on-surface leading-none">
-              {pendingSugeridos}
-              <span className="text-[14px] sm:text-[20px] opacity-50">/{totalSugeridos}</span>
-            </div>
-            <div className="font-sans text-[12px] sm:text-[15px] mt-1.5 sm:mt-2 text-primary flex items-center gap-1">
-              <TrendingUp size={13} className="flex-shrink-0" />
-              <span className="truncate">{confirmedCount > 0 ? `${confirmedCount} ya confirmados` : 'Sin confirmaciones aún'}</span>
-            </div>
-          </div>
+      {/* Resumen de sugeridos */}
+      <button
+        type="button"
+        onClick={() => onNavigate('compras')}
+        className="w-full text-left bg-primary-container text-on-primary rounded-3xl p-5 mb-4 active:scale-[0.99] transition-transform cursor-pointer"
+      >
+        <div className="flex items-center justify-between">
+          <span className="font-sans text-sm font-semibold text-on-primary-container/90">Sugeridos por pedir</span>
+          <span className="flex items-center gap-1 text-sm font-semibold text-on-primary-container">
+            Ver compras <ArrowRight size={16} />
+          </span>
         </div>
-
-        {/* Card 2: Ya Pedidos / Confirmados */}
-        <div className="bg-card-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-[0_4px_20px_rgba(40,28,25,0.05)] flex flex-col justify-between min-h-[130px] sm:min-h-[160px] relative overflow-hidden group cursor-pointer" onClick={() => onNavigate('compras')}>
-          <div className="absolute -right-4 -bottom-4 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity pointer-events-none">
-            <CheckCircle2 size={100} className="sm:hidden" />
-            <CheckCircle2 size={140} className="hidden sm:block" />
-          </div>
-          <div className="flex justify-between items-start relative z-10">
-            <span className="font-mono text-[10.5px] sm:text-[13px] opacity-70 uppercase tracking-wider">Ya Pedidos</span>
-            <div className="bg-secondary-container text-on-secondary-container rounded-full p-1.5 sm:p-2 flex-shrink-0">
-              <CheckCircle2 size={16} className="sm:hidden" />
-              <CheckCircle2 size={20} className="hidden sm:block" />
-            </div>
-          </div>
-          <div className="relative z-10 mt-3 sm:mt-4">
-            <div className="font-sans text-[26px] sm:text-[40px] md:text-[48px] font-bold text-on-surface leading-none">
-              {confirmedCount}
-            </div>
-            <div className="font-sans text-[12px] sm:text-[15px] mt-1.5 sm:mt-2 text-secondary flex items-center gap-1">
-              <span className="truncate">
-                {confirmedCount === 0
-                  ? 'Marca productos como pedidos'
-                  : `${Math.round((confirmedCount / Math.max(totalSugeridos, 1)) * 100)}% del total confirmado`}
-              </span>
-            </div>
-          </div>
+        <div className="mt-2 flex items-end gap-2">
+          <span className="font-sans text-5xl font-bold leading-none tabular">{pendingSugeridos}</span>
+          <span className="font-sans text-base text-on-primary-container/80 pb-1">de {totalSugeridos}</span>
         </div>
-      </div>
-
-      {/* Card 3: Productos que más rotan — full-width row, own breathing room */}
-      <div className="bg-card-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-[0_4px_20px_rgba(40,28,25,0.05)] relative overflow-hidden group mb-8 sm:mb-10">
-        <div className="flex justify-between items-start mb-4 sm:mb-5">
-          <span className="font-mono text-[10.5px] sm:text-[13px] opacity-70 uppercase tracking-wider">Alta Rotación</span>
-          <div className="bg-primary-container text-on-primary-container rounded-full p-1.5 sm:p-2 flex-shrink-0">
-            <Repeat2 size={16} className="sm:hidden" />
-            <Repeat2 size={20} className="hidden sm:block" />
-          </div>
+        <div
+          className="mt-4 h-2 rounded-full bg-white/20 overflow-hidden"
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Porcentaje confirmado"
+        >
+          <div className="h-full bg-tertiary-container rounded-full transition-[width] duration-500" style={{ width: `${pct}%` }} />
         </div>
+        <p className="mt-2 font-sans text-sm text-on-primary-container/90">
+          {confirmedCount === 0 ? 'Aún no hay pedidos confirmados' : `${confirmedCount} ya pedidos · ${pct}% confirmado`}
+        </p>
+      </button>
 
-        {topProducts.length === 0 ? (
-          <p className="font-sans text-[13px] sm:text-[14px] text-on-surface-variant">Aún no hay suficientes datos de sugeridos.</p>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5">
+      {/* Alta rotación */}
+      {topProducts.length > 0 && (
+        <section className="bg-card-surface rounded-3xl p-5 mb-6">
+          <h3 className="font-sans text-base font-bold text-on-surface mb-1">Alta rotación</h3>
+          <ol>
             {topProducts.map((p, i) => (
-              <div key={i} className="min-w-0">
-                <span className={`font-mono text-[11px] font-bold ${i === 0 ? 'text-primary' : 'text-on-surface-variant/60'}`}>
-                  #{i + 1}
-                </span>
-                <div className="font-sans text-[13.5px] font-semibold text-on-surface truncate mt-1">{p.name}</div>
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  {p.confirmed > 0 && (
-                    <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-primary/10 text-primary rounded-full font-mono text-[10px] font-bold border border-primary/20">
-                      <CheckCircle2 size={10} />
-                      {p.confirmed}
-                    </span>
-                  )}
-                  <span className="font-mono text-[11px] text-on-surface-variant">{p.total}x</span>
-                </div>
-              </div>
+              <li key={i} className="flex items-center gap-3 min-h-12 border-b border-outline-variant/30 last:border-0">
+                <span className={`w-6 text-sm font-bold tabular ${i === 0 ? 'text-primary-container' : 'text-on-surface-variant'}`}>{i + 1}</span>
+                <span className="flex-1 min-w-0 font-sans text-sm font-semibold text-on-surface truncate">{p.name}</span>
+                <span className="font-sans text-sm text-on-surface-variant tabular shrink-0">{p.total}x</span>
+              </li>
             ))}
-          </div>
+          </ol>
+        </section>
+      )}
+
+      {/* Estado de pasillos */}
+      <section>
+        <h3 className="font-sans text-lg font-bold text-on-surface mb-3">Estado de pasillos</h3>
+        <div className="flex gap-2 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-3" role="tablist" aria-label="Filtrar pasillos por estado">
+          {chips.map(c => (
+            <button
+              key={c.id}
+              role="tab"
+              aria-selected={activeFilter === c.id}
+              onClick={() => setFilter(c.id)}
+              className={`shrink-0 min-h-11 px-4 rounded-full font-sans text-sm font-bold flex items-center gap-2 cursor-pointer transition-colors ${
+                activeFilter === c.id ? 'bg-primary-container text-on-primary' : 'bg-white border border-outline-variant text-on-surface-variant'
+              }`}
+            >
+              {c.dot && <span className={`w-2.5 h-2.5 rounded-full ${c.dot}`} />}
+              {c.label}
+              <span className="tabular text-xs opacity-80">{c.n}</span>
+            </button>
+          ))}
+        </div>
+
+        {visibleAisles.length === 0 ? (
+          <p className="py-8 text-center font-sans text-sm text-on-surface-variant">Ningún pasillo en este estado.</p>
+        ) : (
+          <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+            {visibleAisles.map(aisle => {
+              const st = statusOf(aisle);
+              const n = aisle.productsCount || 0;
+              return (
+                <li key={aisle.id}>
+                  <button
+                    onClick={() => onNavigate('pasillo-detail', aisle.number)}
+                    className="w-full min-h-14 flex items-center gap-3 pl-3 pr-2 py-2 rounded-2xl bg-card-surface border border-outline-variant/40 text-left active:bg-surface-container md:hover:border-primary/40 transition-colors cursor-pointer"
+                  >
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotOf[st]}`} aria-hidden="true" />
+                    <span className="flex-1 min-w-0">
+                      <span className="block font-sans text-sm font-bold text-on-surface truncate">{aisle.name}</span>
+                      <span className="block font-sans text-xs text-on-surface-variant">
+                        {labelOf[st]} · {n} {n === 1 ? 'ítem' : 'ítems'}
+                      </span>
+                    </span>
+                    <ChevronRight size={18} className="text-on-surface-variant shrink-0" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         )}
-      </div>
-
-      {/* Aisles Grid */}
-      <div>
-        <div className="flex justify-between items-center mb-3 sm:mb-4 flex-wrap gap-y-2">
-          <h3 className="font-sans text-[17px] sm:text-[20px] font-semibold text-on-surface">Estado de Pasillos</h3>
-          <div className="flex gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 rounded-full bg-surface-variant/50 font-mono text-[10.5px] sm:text-[13px]">
-              <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div> <span className="sm:hidden">Con stock</span><span className="hidden sm:inline">Con productos</span>
-            </div>
-            <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 rounded-full bg-surface-variant/50 font-mono text-[10.5px] sm:text-[13px]">
-              <div className="w-2 h-2 rounded-full bg-tertiary flex-shrink-0"></div> Vacío
-            </div>
-            <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 rounded-full bg-surface-variant/50 font-mono text-[10.5px] sm:text-[13px]">
-              <div className="w-2 h-2 rounded-full bg-error flex-shrink-0"></div> Crítico
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-5">
-          {aisles.map((aisle) => {
-            const hasProducts = (aisle.productsCount || 0) > 0;
-            const isCritical = criticalAisles.has(aisle.number);
-            const color = isCritical ? 'bg-error' : hasProducts ? 'bg-primary' : 'bg-tertiary';
-            const textColor = isCritical ? 'text-error' : hasProducts ? 'text-primary' : 'text-on-tertiary-fixed-variant';
-            const bgLight = isCritical ? 'bg-error-container' : hasProducts ? 'bg-primary/10' : 'bg-tertiary-container/40';
-            const badgeLabel = isCritical ? 'Crítico' : hasProducts ? 'Con stock' : 'Vacío';
-            return (
-              <div
-                key={aisle.id}
-                onClick={() => onNavigate('pasillo-detail', aisle.number)}
-                className="bg-card-surface rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-[0_4px_20px_rgba(40,28,25,0.05)] hover:-translate-y-1 transition-transform cursor-pointer border border-transparent hover:border-outline-variant/50 relative overflow-hidden"
-              >
-                <div className={`absolute top-0 left-0 w-full h-1 ${color}`}></div>
-                <div className="flex justify-between items-start mb-2.5 sm:mb-4">
-                  <div className="min-w-0">
-                    <h4 className="font-sans text-[15px] sm:text-[20px] font-bold text-on-surface truncate">
-                      {aisle.name.toLowerCase().includes('nevera')
-                        ? 'Nevera'
-                        : (aisle.name.toLowerCase().includes('cabezal') || aisle.name.toLowerCase().includes('promoción') || aisle.name.toLowerCase().includes('promociones'))
-                          ? 'Cabezales'
-                          : `Pasillo ${aisle.number}`}
-                    </h4>
-                    <span className="font-mono text-[10.5px] sm:text-[13px] opacity-60 truncate block">{aisle.name}</span>
-                  </div>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-1.5 sm:gap-0">
-                  <div>
-                    <div className="font-mono text-[10.5px] sm:text-[13px] opacity-70 mb-0.5 sm:mb-1">Productos</div>
-                    <div className="font-sans text-[13px] sm:text-[16px] text-on-surface font-semibold">
-                      {aisle.productsCount || 0} {(aisle.productsCount || 0) === 1 ? 'ítem' : 'ítems'}
-                    </div>
-                  </div>
-                  <div className={`${bgLight} ${textColor} self-start sm:self-auto px-2 sm:px-3 py-0.5 sm:py-1 rounded-full font-mono text-[10.5px] sm:text-[13px] font-medium`}>
-                    {badgeLabel}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -18,7 +18,7 @@ export function SelectCheckbox({ checked, onChange, size = 'md', label }: Select
       onClick={onChange}
       aria-pressed={checked}
       aria-label={label}
-      className={`${dims} flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer active:scale-90 ${
+      className={`${dims} relative before:content-[''] before:absolute before:-inset-3 flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer active:scale-90 ${
         checked
           ? 'bg-primary'
           : 'bg-white border-2 border-outline-variant hover:border-primary/50'

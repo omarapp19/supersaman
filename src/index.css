@@ -74,19 +74,70 @@
   --color-offline-banner: #FFD788;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-on-surface);
   -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
 }
 
-/* Hide scrollbar for clear aesthetic */
-::-webkit-scrollbar {
-  display: none;
+/* Cifras alineadas en tablas, cantidades y precios */
+table, input[type="number"], .tabular {
+  font-variant-numeric: tabular-nums;
 }
-* {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+
+/* Marca en los detalles que el navegador dibuja */
+::selection {
+  background: color-mix(in srgb, var(--color-primary) 22%, transparent);
+  color: var(--color-on-surface);
+}
+input, textarea {
+  caret-color: var(--color-primary);
+}
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline-offset: 0;
+}
+
+/* Táctil: sin retardo de doble toque y sin zoom de iOS al enfocar campos */
+button, a, [role="button"], label, select, summary {
+  touch-action: manipulation;
+}
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Barras de scroll ocultas solo en pantallas táctiles; en escritorio se ven */
+@media (pointer: coarse) {
+  ::-webkit-scrollbar { display: none; }
+  * { scrollbar-width: none; -ms-overflow-style: none; }
+}
+@media (pointer: fine) {
+  * { scrollbar-width: thin; scrollbar-color: var(--color-outline-variant) transparent; }
+}
+
+/* Safe areas (notch / barra de gestos) */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pt-safe { padding-top: env(safe-area-inset-top); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .offline-banner {

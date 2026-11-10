@@ -1,12 +1,14 @@
 import { useState, useEffect, FormEvent, useMemo } from 'react';
 import { ViewState, Product, Aisle } from '../types';
 import { mockProductsByAisle, mockAisles } from '../data';
-import { CloudOff, ArrowLeft, MoreVertical, Search, ScanBarcode, ArrowDownAZ, Plus, X, Trash2, Pencil } from 'lucide-react';
+import { CloudOff, ArrowLeft, Search, ScanBarcode, ArrowDownAZ, Plus, X, Trash2, ChevronRight } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../firebase';
 import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { BarcodeScanner } from './BarcodeScanner';
 import { RowActionButton } from './ui/RowActionButton';
 import { useToast } from './Toast';
+import { ProductListSkeleton } from './ui/Skeleton';
+import { LoadMore } from './ui/LoadMore';
 
 interface PasilloDetailViewProps {
   onNavigate: (view: ViewState, aisleNum?: number) => void;
@@ -24,10 +26,10 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
   if (user?.role === 'operador' && user.assignedAisles !== undefined && Array.isArray(user.assignedAisles) && user.assignedAisles.length > 0) {
     if (!user.assignedAisles.includes(aisle.number)) {
       return (
-        <div className="w-full text-center py-12 bg-card-surface rounded-3xl border border-error/20 p-6 max-w-md mx-auto mt-12 shadow-sm">
+        <div className="w-full text-center bg-card-surface rounded-3xl border border-error/20 p-6 max-w-md mx-auto mt-8">
           <h3 className="font-sans text-[20px] font-bold text-error mb-2">Acceso Denegado</h3>
           <p className="font-sans text-[15px] text-on-surface-variant mb-6">No tienes permisos para visualizar o gestionar este pasillo.</p>
-          <button onClick={() => onNavigate('pasillos')} className="px-6 py-2.5 bg-primary text-white rounded-full font-sans text-[14px] font-semibold">
+          <button onClick={() => onNavigate('pasillos')} className="px-6 min-h-12 bg-primary-container text-on-primary rounded-xl font-sans text-base font-bold cursor-pointer">
             Volver a Pasillos
           </button>
         </div>
@@ -38,6 +40,9 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
   
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [searchQuery, setSearchQuery] = useState('');
+  const PAGE = 40;
+  const [limit, setLimit] = useState(PAGE);
+  const [loadingProducts, setLoadingProducts] = useState(isFirebaseConfigured);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
@@ -202,6 +207,25 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
       (window as any).__samanProductsCache = null;
     }
     setProductToDelete(null);
+    toast.success('Producto eliminado.', 7000, { label: 'Deshacer', onClick: () => restoreProduct(product) });
+  };
+
+  const restoreProduct = async (product: Product) => {
+    try {
+      if (isFirebaseConfigured && aisle?.id) {
+        const { id, ...data } = product;
+        await setDoc(doc(db, 'aisles', aisle.id, 'products', id), data);
+      } else {
+        setProducts(prev => [...prev, product].sort((a, b) => a.name.localeCompare(b.name)));
+      }
+      if (typeof window !== 'undefined') {
+        (window as any).__samanProductsCache = null;
+      }
+      toast.info('Producto restaurado.');
+    } catch (err) {
+      console.error('Error al restaurar producto:', err);
+      toast.error('No se pudo restaurar el producto.');
+    }
   };
 
   const handleProductSubmit = async (e: FormEvent) => {
@@ -293,6 +317,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
 
   useEffect(() => {
     if (!aisle?.id) return;
+    setLoadingProducts(isFirebaseConfigured);
 
     if (isFirebaseConfigured) {
       const productsRef = collection(db, 'aisles', aisle.id, 'products');
@@ -305,6 +330,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
         // Default sort by name to keep them stable
         productsData.sort((a, b) => a.name.localeCompare(b.name));
         setProducts(productsData);
+        setLoadingProducts(false);
 
         // Update parent aisle count in Firestore if different
         if (aisle.productsCount !== productsData.length && aisles.some(a => a.id === aisle.id)) {
@@ -319,6 +345,7 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
         }
       }, (error) => {
         console.error("Error al escuchar productos de Firestore:", error);
+        setLoadingProducts(false);
       });
       return unsubscribe;
     } else {
@@ -372,345 +399,275 @@ export function PasilloDetailView({ onNavigate, selectedAisleNumber, aisles, onD
     return 0;
   });
 
+  const canEdit = user?.role === 'operador' || user?.role === 'admin';
+  useEffect(() => { setLimit(PAGE); }, [searchQuery, sortOrder, selectedAisleNumber]);
+  const shownProducts = sortedProducts.slice(0, limit);
+  const inputCls =
+    'w-full min-h-12 bg-white border border-outline rounded-xl px-4 font-sans text-base text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 transition-colors';
+  const labelCls = 'font-sans text-sm font-semibold text-on-surface';
+  const openNewProduct = () => {
+    handleCloseProductModal();
+    setShowProductModal(true);
+    fetchAllProducts(); // Carga las empresas en segundo plano
+  };
+  const openEditProduct = (product: Product) => {
+    handleStartEditProduct(product);
+    fetchAllProducts();
+  };
+  const statusBadge = (status: Product['status']) => {
+    if (status === 'bajo')
+      return <span className="px-2 py-0.5 bg-tertiary-container text-on-tertiary-fixed-variant rounded-full font-sans text-xs font-bold shrink-0">Bajo</span>;
+    if (status === 'crítico')
+      return <span className="px-2 py-0.5 bg-error-container text-on-error-container rounded-full font-sans text-xs font-bold shrink-0">Crítico</span>;
+    return null;
+  };
+
   return (
     <>
-      <div className="w-full h-full mx-auto animate-in fade-in slide-in-from-right-4 duration-500 pb-12">
-      {isOffline && (
-        <div className="offline-banner w-full py-1.5 flex justify-center items-center gap-2 shadow-sm rounded-lg mb-4 animate-in fade-in slide-in-from-top-2">
-          <CloudOff size={14} className="text-on-tertiary-fixed-variant" />
-          <span className="font-mono text-[13px] font-medium text-on-tertiary-fixed-variant">Modo offline activo</span>
+      <div className="w-full mx-auto animate-in fade-in duration-300 pb-32 md:pb-24">
+        {isOffline && (
+          <div role="status" className="offline-banner w-full min-h-10 flex justify-center items-center gap-2 rounded-xl mb-3">
+            <CloudOff size={16} className="text-on-tertiary-fixed-variant" />
+            <span className="font-sans text-sm font-semibold text-on-tertiary-fixed-variant">Sin conexión · los cambios se guardan al reconectar</span>
+          </div>
+        )}
+
+        {/* Cabecera fija: volver, título y buscador */}
+        <div className="sticky top-0 z-30 -mt-4 md:-mt-8 -mx-4 px-4 md:-mx-8 md:px-8 pt-[max(0.5rem,env(safe-area-inset-top))] pb-3 bg-background">
+          <header className="flex items-center gap-1 mb-2">
+            <button
+              onClick={() => onNavigate('pasillos')}
+              aria-label="Volver a pasillos"
+              className="w-11 h-11 -ml-2 flex items-center justify-center rounded-full active:bg-surface-variant transition-colors cursor-pointer"
+            >
+              <ArrowLeft size={24} />
+            </button>
+            <div className="min-w-0 flex-1">
+              <h1 className="font-sans text-lg font-bold text-on-surface leading-tight truncate">{aisle.name}</h1>
+              <p className="font-sans text-xs text-on-surface-variant tabular">
+                Pasillo {aisle.number} · {sortedProducts.length} {sortedProducts.length === 1 ? 'ítem' : 'ítems'}
+                {searchQuery && ` de ${products.length}`}
+              </p>
+            </div>
+            <button
+              onClick={() => setSortOrder(prev => (prev === null ? 'asc' : prev === 'asc' ? 'desc' : null))}
+              aria-label="Ordenar por nombre"
+              className={`min-h-11 px-3 rounded-full flex items-center gap-1.5 font-sans text-sm font-bold cursor-pointer transition-colors ${
+                sortOrder ? 'bg-primary-container text-on-primary' : 'text-on-surface-variant active:bg-surface-variant'
+              }`}
+            >
+              <ArrowDownAZ size={20} />
+              {sortOrder === 'asc' && 'A-Z'}
+              {sortOrder === 'desc' && 'Z-A'}
+            </button>
+          </header>
+
+          <div className="relative">
+            <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+            <input
+              type="search"
+              enterKeyHint="search"
+              placeholder="Buscar producto, marca o SKU…"
+              aria-label="Buscar en este pasillo"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full min-h-12 bg-white border border-outline rounded-2xl pl-12 pr-14 font-sans text-base text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+            />
+            <button
+              onClick={() => setShowScanner(true)}
+              aria-label="Escanear código de barras"
+              className="absolute inset-y-0 right-0 w-14 flex items-center justify-center text-primary-container cursor-pointer"
+            >
+              <ScanBarcode size={24} />
+            </button>
+          </div>
         </div>
-      )}
 
-      {/* Header */}
-      <header className="flex items-center justify-between mb-4">
-        <button onClick={() => window.history.back()} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant transition-colors">
-          <ArrowLeft size={24} />
-        </button>
-        <h1 className="font-sans text-[20px] font-semibold text-on-surface">
-          {aisle.name.toLowerCase().includes('nevera') 
-            ? 'Detalle de Nevera' 
-            : (aisle.name.toLowerCase().includes('cabezal') || aisle.name.toLowerCase().includes('promoción') || aisle.name.toLowerCase().includes('promociones'))
-              ? 'Detalle de Cabezales' 
-              : 'Detalle de Pasillo'}
-        </h1>
-        <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant transition-colors">
-          <MoreVertical size={24} />
-        </button>
-      </header>
-
-      {/* Search & Sort */}
-      <div className="relative mb-4">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-on-surface-variant">
-          <Search size={20} />
-        </div>
-        <input 
-          type="text" 
-          placeholder="Buscar producto o SKU..." 
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-white border border-outline-variant/50 rounded-full py-3 pl-12 pr-12 font-sans text-[16px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
-        />
-        <button
-            onClick={() => setShowScanner(true)}
-            className="absolute inset-y-0 right-0 pr-4 flex items-center text-primary hover:text-primary/70 transition-colors"
-            title="Escanear código de barra"
-          >
-            <ScanBarcode size={24} />
-          </button>
-      </div>
-
-      <div className="flex items-center justify-between px-2 mb-6">
-        <span className="font-mono text-[13px] text-on-surface-variant">
-          {aisle.name.toLowerCase().includes('nevera') 
-            ? `En ${aisle.name}` 
-            : (aisle.name.toLowerCase().includes('cabezal') || aisle.name.toLowerCase().includes('promoción') || aisle.name.toLowerCase().includes('promociones'))
-              ? `En ${aisle.name}` 
-              : `En Pasillo ${aisle.number} - ${aisle.name}`}
-        </span>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => {
-              handleCloseProductModal();
-              setShowProductModal(true);
-              fetchAllProducts(); // Carga las empresas en segundo plano
-            }}
-            className="flex items-center gap-1 text-primary font-mono text-[13px] font-semibold hover:bg-primary/5 px-3 py-1.5 rounded-full border border-primary/20 transition-colors cursor-pointer bg-white"
-          >
-            <Plus size={14} />
-            Agregar Producto
-          </button>
-          
-          <button 
-            onClick={() => {
-              setSortOrder(prev => {
-                if (prev === null) return 'asc';
-                if (prev === 'asc') return 'desc';
-                return null;
-              });
-            }}
-            className={`flex items-center gap-1 font-mono text-[13px] font-medium hover:bg-primary/5 px-3 py-1.5 rounded-full transition-colors ${
-              sortOrder ? 'bg-primary/10 text-primary font-semibold' : 'text-on-surface-variant'
-            }`}
-          >
-            <ArrowDownAZ size={16} />
-            {sortOrder === 'asc' && 'A-Z'}
-            {sortOrder === 'desc' && 'Z-A'}
-            {sortOrder === null && 'Ordenar'}
-          </button>
-        </div>
-      </div>
-
-      {/* List */}
-      <div className="flex flex-col gap-3 max-w-4xl mx-auto w-full">
-        {(() => {
-          return (
-            <>
-              <div className="flex items-center justify-between py-1 px-2">
-                <h2 className="font-mono text-[13px] font-medium text-on-surface-variant uppercase tracking-wider">Pasillo {aisle.number} - {aisle.name}</h2>
-                <span className="font-mono text-[13px] text-on-surface-variant/70">
-                  {sortedProducts.length} {sortedProducts.length === 1 ? 'ítem' : 'ítems'}
-                </span>
+        {/* Lista */}
+        <div className="flex flex-col gap-2 max-w-4xl mx-auto w-full mt-1">
+          {loadingProducts && products.length === 0 ? (
+            <ProductListSkeleton count={7} />
+          ) : sortedProducts.length === 0 ? (
+            <div className="bg-card-surface rounded-3xl p-8 text-center border border-outline-variant/40 flex flex-col items-center mt-4">
+              <div className="bg-primary/10 text-primary-container p-4 rounded-full mb-4">
+                <ScanBarcode size={32} />
               </div>
-
-              {sortedProducts.length === 0 ? (
-                <div className="bg-card-surface rounded-[32px] p-12 text-center border border-outline-variant/30 flex flex-col items-center justify-center max-w-xl mx-auto shadow-sm mt-8 animate-in fade-in duration-300 w-full">
-                  <div className="bg-primary/10 text-primary p-4 rounded-full mb-4">
-                    <ScanBarcode size={36} />
+              {searchQuery ? (
+                <>
+                  <h3 className="font-sans text-lg font-bold text-on-surface mb-1">Sin resultados para “{searchQuery}”</h3>
+                  <p className="font-sans text-sm text-on-surface-variant mb-5">Revisa el nombre o el SKU, o agrégalo como producto nuevo.</p>
+                  <div className="flex gap-2 w-full">
+                    <button onClick={() => setSearchQuery('')} className="flex-1 min-h-12 rounded-xl border border-outline bg-white font-sans text-sm font-bold cursor-pointer">Limpiar búsqueda</button>
+                    <button onClick={openNewProduct} className="flex-1 min-h-12 rounded-xl bg-primary-container text-on-primary font-sans text-sm font-bold cursor-pointer">Agregar producto</button>
                   </div>
-                  <h3 className="font-sans text-[20px] font-bold text-on-surface mb-2">No hay productos en este pasillo</h3>
-                  <p className="font-sans text-[15px] text-on-surface-variant max-w-md mb-6">Comienza a registrar la mercadería del pasillo con el botón "Agregar Producto".</p>
-                </div>
+                </>
               ) : (
-                sortedProducts.map(product => {
-                  return (
-                    <div key={product.id} className="bg-card-surface rounded-[16px] p-3 shadow-[0_4px_20px_rgba(40,28,25,0.05)] flex items-center gap-3 group">
-                      {/* Product Image / Avatar */}
-                      <div className="w-16 h-16 rounded-[12px] bg-white border border-outline-variant/30 flex-shrink-0 overflow-hidden flex items-center justify-center">
-                        {product.imageUrl ? (
-                          <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="font-sans text-[20px] font-bold text-on-surface-variant/40">{product.initials}</span>
-                        )}
-                      </div>
-
-                      {/* Product Info */}
-                      <div className="flex-grow flex flex-col justify-center overflow-hidden pr-2 min-w-0 gap-1">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <h3 className="font-sans text-[16px] font-semibold text-on-surface leading-snug truncate min-w-0">{product.name}</h3>
-                          {(user?.role === 'operador' || user?.role === 'admin') && (
-                            <button
-                              onClick={() => {
-                                handleStartEditProduct(product);
-                                fetchAllProducts(); // Carga las empresas en segundo plano
-                              }}
-                              className="text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors p-1.5 rounded-lg inline-flex items-center justify-center flex-shrink-0 cursor-pointer"
-                              title="Editar producto"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                          )}
-                          {product.status === 'normal' && (
-                            <span className="px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full font-mono text-[10px] font-bold uppercase flex-shrink-0">Normal</span>
-                          )}
-                          {product.status === 'bajo' && (
-                            <span className="px-2 py-0.5 bg-tertiary-container/40 text-on-tertiary-fixed-variant border border-tertiary-fixed-dim/60 rounded-full font-mono text-[10px] font-bold uppercase flex-shrink-0">Bajo</span>
-                          )}
-                          {product.status === 'crítico' && (
-                            <span className="px-2 py-0.5 bg-error-container text-on-error-container border border-error/20 rounded-full font-mono text-[10px] font-bold uppercase animate-pulse flex-shrink-0">Crítico</span>
-                          )}
-                        </div>
-                        <span className="font-mono text-[12px] text-on-surface-variant truncate block">
-                          {product.brand} • SKU: {product.sku || 'N/A'} • Caja: {product.und_x_caja ?? 0} und{product.company ? ` • ${product.company}` : ''}{product.sellingUnit === 'kg' ? ' • Venta: Kg' : ''}
-                        </span>
-                      </div>
-
-                      {/* Delete Button */}
-                      <RowActionButton
-                        icon={Trash2}
-                        variant="danger"
-                        label="Eliminar producto"
-                        onClick={() => setProductToDelete(product)}
-                      />
-                    </div>
-                  );
-                })
+                <>
+                  <h3 className="font-sans text-lg font-bold text-on-surface mb-1">Este pasillo está vacío</h3>
+                  <p className="font-sans text-sm text-on-surface-variant mb-5">Escanea un código de barras o agrega el primer producto a mano.</p>
+                  <button onClick={openNewProduct} className="w-full min-h-12 rounded-xl bg-primary-container text-on-primary font-sans text-sm font-bold cursor-pointer">Agregar producto</button>
+                </>
               )}
-            </>
-          );
-        })()}
-      </div>
+            </div>
+          ) : (
+            shownProducts.map(product => {
+              const body = (
+                <>
+                  <div className="w-12 h-12 rounded-xl bg-white border border-outline-variant/50 shrink-0 overflow-hidden flex items-center justify-center">
+                    {product.imageUrl ? (
+                      <img src={product.imageUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="font-sans text-base font-bold text-on-surface-variant/60">{product.initials}</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-2">
+                      <h3 className="font-sans text-base font-semibold text-on-surface leading-snug line-clamp-2 min-w-0">{product.name}</h3>
+                      {statusBadge(product.status)}
+                    </div>
+                    <p className="font-sans text-sm text-on-surface-variant truncate">
+                      {[product.brand, product.sku ? `SKU ${product.sku}` : null, product.company].filter(Boolean).join(' · ')}
+                    </p>
+                    {((product.und_x_caja ?? 0) > 0 || product.sellingUnit === 'kg') && (
+                      <p className="font-sans text-xs text-on-surface-variant tabular">
+                        {[(product.und_x_caja ?? 0) > 0 ? `Caja de ${product.und_x_caja} und` : null, product.sellingUnit === 'kg' ? 'Se vende por kg' : null].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
+                  </div>
+                </>
+              );
+              return canEdit ? (
+                <button
+                  key={product.id}
+                  onClick={() => openEditProduct(product)}
+                  aria-label={`Editar ${product.name}`}
+                  className="w-full text-left bg-card-surface border border-outline-variant/40 rounded-2xl p-3 flex items-center gap-3 min-h-[76px] active:bg-surface-container md:hover:border-primary/40 transition-colors cursor-pointer"
+                >
+                  {body}
+                  <ChevronRight size={20} className="text-on-surface-variant shrink-0" />
+                </button>
+              ) : (
+                <div key={product.id} className="bg-card-surface border border-outline-variant/40 rounded-2xl p-3 flex items-center gap-3 min-h-[76px]">
+                  {body}
+                  <RowActionButton icon={Trash2} variant="danger" label="Eliminar producto" onClick={() => handleDeleteProduct(product)} />
+                </div>
+              );
+            })
+          )}
+          {!loadingProducts && <LoadMore shown={shownProducts.length} total={sortedProducts.length} onMore={() => setLimit(l => l + PAGE)} />}
+        </div>
       </div>
 
-      {/* Product Creation Modal */}
+      {/* Acción principal flotante, al alcance del pulgar */}
+      <button
+        onClick={openNewProduct}
+        className="fixed right-4 md:right-8 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] md:bottom-8 z-40 h-14 px-6 rounded-full bg-primary-container text-on-primary shadow-[0_6px_20px_rgba(40,28,25,0.25)] font-sans text-base font-bold flex items-center gap-2 active:scale-95 transition-transform cursor-pointer print-hide"
+      >
+        <Plus size={22} />
+        Agregar producto
+      </button>
+
+      {/* Crear / editar producto: hoja inferior en móvil, diálogo en PC */}
       {showProductModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={handleCloseProductModal}>
-          <div className="bg-card-surface rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center p-6 border-b border-outline-variant/20">
-              <h3 className="font-sans text-[20px] font-bold text-on-surface">
-                {editingProduct ? 'Editar Producto' : 'Agregar Nuevo Producto'}
-              </h3>
-              <button onClick={handleCloseProductModal} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-variant transition-colors">
-                <X size={20} />
+        <div
+          className="fixed inset-0 bg-inverse-surface/50 z-[70] flex items-end md:items-center justify-center md:p-4 animate-in fade-in duration-200"
+          onClick={handleCloseProductModal}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={editingProduct ? 'Editar producto' : 'Nuevo producto'}
+            className="bg-card-surface w-full md:max-w-md rounded-t-3xl md:rounded-3xl shadow-[0_-10px_40px_rgba(40,28,25,0.2)] max-h-[92dvh] flex flex-col animate-in slide-in-from-bottom md:zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-outline-variant md:hidden" aria-hidden="true" />
+            <div className="flex justify-between items-center px-5 pt-3 pb-2">
+              <h3 className="font-sans text-xl font-bold text-on-surface">{editingProduct ? 'Editar producto' : 'Nuevo producto'}</h3>
+              <button onClick={handleCloseProductModal} aria-label="Cerrar" className="w-11 h-11 -mr-2 rounded-full flex items-center justify-center active:bg-surface-variant cursor-pointer">
+                <X size={22} />
               </button>
             </div>
 
-            <form onSubmit={handleProductSubmit} className="p-6 flex flex-col gap-4 max-h-[80vh] overflow-y-auto">
-              <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Nombre del Producto</label>
-                <input 
-                  type="text" 
-                  required
-                  autoFocus
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
-                  placeholder="Ej. Leche Semidescremada 1L"
-                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Marca</label>
-                <input 
-                  type="text" 
-                  required
-                  value={productBrand}
-                  onChange={(e) => setProductBrand(e.target.value)}
-                  placeholder="Ej. Parmalat"
-                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">SKU / Código</label>
-                <input 
-                  type="text" 
-                  required
-                  value={productSku}
-                  onChange={(e) => setProductSku(e.target.value)}
-                  placeholder="Ej. 75010203"
-                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Empresa / Distribuidor</label>
-                <input 
-                  type="text" 
-                  list="companies-list"
-                  value={productCompany}
-                  onChange={(e) => setProductCompany(e.target.value)}
-                  placeholder="Ej. Alimentos Polar"
-                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Unidades por Caja</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  value={productUndXCaja}
-                  onChange={(e) => setProductUndXCaja(e.target.value)}
-                  placeholder="Ej. 24"
-                  className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3 px-4 font-sans text-[15px] text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Unidad de Venta</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setProductSellingUnit('und')}
-                    className={`flex-1 py-2.5 rounded-xl border text-[13px] font-semibold transition-all cursor-pointer ${
-                      productSellingUnit === 'und'
-                        ? 'bg-primary text-white border-primary shadow-sm'
-                        : 'bg-white border-outline-variant text-on-surface hover:bg-surface-variant/20'
-                    }`}
-                  >
-                    Por Unidad (und)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setProductSellingUnit('kg')}
-                    className={`flex-1 py-2.5 rounded-xl border text-[13px] font-semibold transition-all cursor-pointer ${
-                      productSellingUnit === 'kg'
-                        ? 'bg-primary text-white border-primary shadow-sm'
-                        : 'bg-white border-outline-variant text-on-surface hover:bg-surface-variant/20'
-                    }`}
-                  >
-                    Por Kilogramo (kg)
-                  </button>
+            <form onSubmit={handleProductSubmit} className="flex flex-col min-h-0">
+              <div className="px-5 pb-4 flex flex-col gap-4 overflow-y-auto">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="p-sku" className={labelCls}>SKU / código</label>
+                  <div className="relative">
+                    <input id="p-sku" type="text" required inputMode="numeric" autoComplete="off" value={productSku} onChange={(e) => setProductSku(e.target.value)} placeholder="Ej. 75010203" className={`${inputCls} pr-14`} />
+                    <button type="button" onClick={() => { handleCloseProductModal(); setShowScanner(true); }} aria-label="Escanear código" className="absolute inset-y-0 right-0 w-12 flex items-center justify-center text-primary-container cursor-pointer">
+                      <ScanBarcode size={22} />
+                    </button>
+                  </div>
                 </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="p-name" className={labelCls}>Nombre del producto</label>
+                  <input id="p-name" type="text" required autoFocus={!!editingProduct || !productSku} autoCapitalize="characters" value={productName} onChange={(e) => setProductName(e.target.value)} placeholder="Ej. Leche semidescremada 1L" className={inputCls} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="p-brand" className={labelCls}>Marca</label>
+                  <input id="p-brand" type="text" required value={productBrand} onChange={(e) => setProductBrand(e.target.value)} placeholder="Ej. Parmalat" className={inputCls} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="p-company" className={labelCls}>Empresa / distribuidor</label>
+                  <input id="p-company" type="text" list="companies-list" value={productCompany} onChange={(e) => setProductCompany(e.target.value)} placeholder="Ej. Alimentos Polar" className={inputCls} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="p-caja" className={labelCls}>Unidades por caja</label>
+                  <input id="p-caja" type="number" inputMode="numeric" min="0" value={productUndXCaja} onChange={(e) => setProductUndXCaja(e.target.value)} placeholder="Ej. 24" className={inputCls} />
+                </div>
+                <fieldset className="flex flex-col gap-1.5">
+                  <legend className={`${labelCls} mb-1.5`}>Se vende por</legend>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([['und', 'Unidad'], ['kg', 'Kilogramo']] as const).map(([val, label]) => (
+                      <button
+                        key={val}
+                        type="button"
+                        aria-pressed={productSellingUnit === val}
+                        onClick={() => setProductSellingUnit(val)}
+                        className={`min-h-12 rounded-xl border font-sans text-sm font-bold transition-colors cursor-pointer ${
+                          productSellingUnit === val ? 'bg-primary-container text-on-primary border-primary-container' : 'bg-white border-outline text-on-surface'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+
+                {editingProduct && (
+                  <button
+                    type="button"
+                    onClick={() => { const p = editingProduct; handleCloseProductModal(); handleDeleteProduct(p); }}
+                    className="min-h-12 rounded-xl text-error font-sans text-sm font-bold flex items-center justify-center gap-2 active:bg-error/10 cursor-pointer"
+                  >
+                    <Trash2 size={18} />
+                    Eliminar producto
+                  </button>
+                )}
               </div>
 
-              <div className="flex gap-3 mt-4">
-                <button 
-                  type="button"
-                  onClick={handleCloseProductModal}
-                  className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all cursor-pointer"
-                >
+              <div className="flex gap-3 px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-outline-variant/40 bg-card-surface">
+                <button type="button" onClick={handleCloseProductModal} className="flex-1 min-h-12 bg-white border border-outline text-on-surface font-sans text-base font-bold rounded-xl cursor-pointer">
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  disabled={savingProduct}
-                  className="flex-1 bg-primary text-white hover:bg-primary/95 font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
-                >
+                <button type="submit" disabled={savingProduct} className="flex-[1.4] min-h-12 bg-primary-container text-on-primary font-sans text-base font-bold rounded-xl disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer">
                   {savingProduct ? (
                     <>
                       <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Guardando...
+                      Guardando…
                     </>
-                  ) : (editingProduct ? 'Guardar Cambios' : 'Crear Producto')}
+                  ) : editingProduct ? 'Guardar cambios' : 'Crear producto'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-      {/* Delete Product Confirmation Modal */}
-      {productToDelete && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setProductToDelete(null)}>
-          <div className="bg-card-surface rounded-[32px] w-full max-w-sm shadow-[0_20px_50px_rgba(40,28,25,0.15)] overflow-hidden border border-outline-variant/30 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 flex flex-col items-center text-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-error-container flex items-center justify-center">
-                <Trash2 size={26} className="text-error" />
-              </div>
-              <div>
-                <h3 className="font-sans text-[20px] font-bold text-on-surface">Eliminar Producto</h3>
-                <p className="font-sans text-[14px] text-on-surface-variant mt-1">
-                  ¿Seguro que deseas eliminar <strong>{productToDelete.name}</strong>? Esta acción no se puede deshacer.
-                </p>
-              </div>
-              <div className="flex gap-3 w-full mt-2">
-                <button
-                  onClick={() => setProductToDelete(null)}
-                  className="flex-1 bg-white border border-outline-variant/50 hover:bg-surface-variant/50 text-on-surface font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => handleDeleteProduct(productToDelete)}
-                  className="flex-1 bg-error hover:bg-error/90 text-on-error font-sans text-[14px] font-semibold py-3.5 rounded-full shadow-sm transition-all"
-                >
-                  Eliminar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Barcode Scanner */}
-      {showScanner && (
-        <BarcodeScanner
-          onScan={handleScanResult}
-          onClose={() => setShowScanner(false)}
-        />
-      )}
 
-      {/* Datalist global para autocompletado de empresas */}
+      {/* Escáner */}
+      {showScanner && <BarcodeScanner onScan={handleScanResult} onClose={() => setShowScanner(false)} />}
+
+      {/* Autocompletado de empresas */}
       <datalist id="companies-list">
         {uniqueCompanies.map(c => (
           <option key={c} value={c} />

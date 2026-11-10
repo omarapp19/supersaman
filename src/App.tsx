@@ -15,7 +15,7 @@ import { auth, isFirebaseConfigured, db } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs, updateDoc } from 'firebase/firestore';
 import { mockOrders, mockAisles } from './data';
-import { MapPin, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { ToastProvider, useToast } from './components/Toast';
 
 export default function App() {
@@ -160,7 +160,7 @@ function AppContent() {
     toast.success("Pedido actualizado con éxito.");
   };
 
-  const handleArchiveOrder = async (orderId: string, archiveState = true) => {
+  const handleArchiveOrder = async (orderId: string, archiveState = true, withUndo = true) => {
     const updates = {
       archived: archiveState,
       archivedAt: new Date().toISOString()
@@ -180,7 +180,11 @@ function AppContent() {
         return updated;
       });
     }
-    toast.success(archiveState ? "Pedido archivado con éxito." : "Pedido restaurado.");
+    toast.success(
+      archiveState ? "Pedido archivado." : "Pedido restaurado.",
+      6000,
+      withUndo ? { label: 'Deshacer', onClick: () => handleArchiveOrder(orderId, !archiveState, false) } : undefined
+    );
   };
 
   const handleArchiveOldOrders = async (daysThreshold = 30): Promise<number> => {
@@ -223,7 +227,23 @@ function AppContent() {
       });
     }
 
-    toast.success(`Se archivaron ${count} pedidos de más de ${daysThreshold} días.`);
+    const restoreAll = async () => {
+      const ids = oldOrders.map(o => o.id);
+      if (isFirebaseConfigured) {
+        for (const id of ids) {
+          try { await updateDoc(doc(db, 'orders', id), { archived: false }); } catch (err) { console.error(err); }
+        }
+      } else {
+        const set = new Set(ids);
+        setOrders(prev => {
+          const updated = prev.map(o => set.has(o.id) ? { ...o, archived: false } : o);
+          localStorage.setItem('saman_orders', JSON.stringify(updated));
+          return updated;
+        });
+      }
+      toast.info(`Se restauraron ${ids.length} pedidos.`);
+    };
+    toast.success(`Se archivaron ${count} pedidos de más de ${daysThreshold} días.`, 8000, { label: 'Deshacer', onClick: restoreAll });
     return count;
   };
 
@@ -655,7 +675,7 @@ function AppContent() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen w-full bg-[#DDEBEA] flex flex-col items-center justify-center font-sans gap-6 select-none relative overflow-hidden">
+      <div className="min-h-dvh w-full bg-[#DDEBEA] flex flex-col items-center justify-center font-sans gap-6 select-none relative overflow-hidden">
         {/* Ambient background blur */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] rounded-full bg-primary/15 blur-3xl animate-pulse"></div>
         <div className="flex flex-col items-center gap-4 relative z-10 animate-pulse">
@@ -674,29 +694,32 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-background)] selection:bg-primary/20 selection:text-primary">
+    <div className="min-h-dvh bg-[var(--color-background)] selection:bg-primary/20 selection:text-primary">
       {/* Desktop Sidebar */}
       <Sidebar currentView={currentView} onNavigate={(view) => navigateToView(view)} onLogout={handleLogout} user={user} />
       
       {/* Mobile Top App Bar (Only visible when not in Pasillo Detail which has its own header) */}
       {currentView !== 'pasillo-detail' && (
-        <header className="flex justify-between items-center w-full px-4 py-2 md:hidden bg-card-surface sticky top-0 z-40 mb-4 print-hide border-b border-outline-variant/20">
-          <img src="/logo.svg" alt="Súper Samán" className="h-12 w-12 mix-blend-multiply" />
-          <div className="flex gap-4 text-primary">
-            <button 
-              className="active:scale-95 transition-transform cursor-pointer"
-              onClick={() => toast.info('Sucursal Principal: Súper Samán')}
-              title="Sucursal Conectada"
-            >
-              <MapPin size={24} />
-            </button>
-            <button className="active:scale-95 transition-transform cursor-pointer" onClick={handleLogout} title="Cerrar Sesión"><LogOut size={22} /></button>
+        <header className="flex items-center gap-3 w-full px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] md:hidden bg-card-surface sticky top-0 z-40 mb-4 print-hide border-b border-outline-variant/30">
+          <img src="/logo.svg" alt="Súper Samán" className="h-11 w-11 mix-blend-multiply shrink-0" />
+          <div className="min-w-0 flex-1 leading-tight">
+            <p className="font-sans text-base font-bold text-on-surface truncate">{(user.displayName || user.username || 'Usuario').split(' ')[0]}</p>
+            <p className="font-sans text-xs text-on-surface-variant capitalize truncate">
+              {user.role === 'operador' ? 'Operador' : user.role === 'supervisor' ? 'Supervisor' : 'Administrador'} · Súper Samán
+            </p>
           </div>
+          <button
+            className="h-11 w-11 -mr-2 flex items-center justify-center rounded-full text-primary-container active:bg-primary/10 transition-colors cursor-pointer"
+            onClick={handleLogout}
+            aria-label="Cerrar sesión"
+          >
+            <LogOut size={22} />
+          </button>
         </header>
       )}
 
       {/* Main Content Workspace */}
-      <main className="md:ml-64 p-4 pb-24 md:p-8 print:ml-0 print:p-0">
+      <main className="md:ml-64 p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:p-8 md:pb-8 print:ml-0 print:p-0">
         {currentView === 'panel' && (
           <PanelView onNavigate={navigateToView} aisles={aisles} orders={orders} checkedOrders={checkedOrders} />
         )}
@@ -716,6 +739,7 @@ function AppContent() {
           <SugeridosView 
             onNavigate={navigateToView} 
             onAddOrders={handleAddOrders}
+            orders={orders}
             aisles={aisles}
             user={user}
           />

@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { auth, isFirebaseConfigured, getFriendlyErrorMessage } from '../firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { LogIn, Lock, User, ShieldAlert } from 'lucide-react';
+import { LogIn, Lock, User, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 
 interface LoginProps {
   onMockLogin: (user: any) => void;
@@ -10,6 +10,7 @@ interface LoginProps {
 export function Login({ onMockLogin }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -142,80 +143,98 @@ export function Login({ onMockLogin }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#DDEBEA] flex items-center justify-center p-4 relative overflow-hidden select-none font-sans">
-      {/* Decorative Blur Background Blobs */}
-      <div className="absolute top-1/4 left-1/4 w-[350px] h-[350px] rounded-full bg-primary/20 blur-3xl animate-pulse duration-[6000ms]"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full bg-secondary-container/30 blur-3xl animate-pulse duration-[8000ms]"></div>
-
-      <div className="bg-card-surface/90 border border-outline-variant/30 backdrop-blur-md rounded-[32px] w-full max-w-md p-8 md:p-10 shadow-[0_20px_50px_rgba(40,28,25,0.08)] relative z-10 transition-all">
-        {/* Brand Header */}
-        <div className="flex flex-col items-center text-center mb-8">
-          <img src="/logo.svg" alt="Súper Samán" className="w-28 h-28 mb-3 drop-shadow-md mix-blend-multiply" />
-          <p className="font-sans text-[14px] text-on-surface-variant mt-1">Ingresa al portal de administración de la sucursal</p>
+    <div className="min-h-dvh w-full bg-primary-container flex flex-col font-sans">
+      {/* Marca */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 pt-[max(2rem,env(safe-area-inset-top))] pb-8 min-h-[34dvh]">
+        <div className="bg-card-surface rounded-[28px] p-3 shadow-[0_8px_24px_rgba(40,28,25,0.25)]">
+          <img src="/logo.svg" alt="Súper Samán" className="w-24 h-24 mix-blend-multiply" />
         </div>
+        <h1 className="mt-5 text-2xl font-bold text-on-primary-container text-center">Súper Samán</h1>
+        <p className="mt-1 text-sm text-on-primary-container/80 text-center">Gestión de pasillos, sugeridos y compras</p>
+      </div>
 
-        {/* Demo Mode Notice */}
+      {/* Formulario */}
+      <div className="bg-card-surface rounded-t-[32px] w-full md:max-w-md md:mx-auto md:mb-10 md:rounded-[32px] px-6 pt-8 pb-[max(2rem,env(safe-area-inset-bottom))] shadow-[0_-8px_32px_rgba(40,28,25,0.18)]">
+        <h2 className="text-xl font-bold text-on-surface mb-5">Iniciar sesión</h2>
+
         {!isFirebaseConfigured && (
-          <div className="bg-tertiary-container/35 border border-tertiary-fixed-dim/60 text-on-tertiary-fixed-variant p-3.5 rounded-2xl flex gap-3 items-start mb-6 text-[13px] leading-relaxed">
-            <ShieldAlert size={18} className="flex-shrink-0 mt-0.5" />
+          <div className="bg-tertiary-container/50 text-on-tertiary-fixed-variant p-3.5 rounded-2xl flex gap-3 items-start mb-5 text-sm leading-relaxed">
+            <ShieldAlert size={20} className="flex-shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold block">Modo Demo Activo</span>
-              Firebase no está configurado aún. Por favor inicia sesión con las credenciales de administrador locales.
+              <span className="font-bold block">Modo demo</span>
+              Firebase no está configurado. Usa las credenciales locales.
             </div>
           </div>
         )}
 
-        {/* Login Form */}
-        <form onSubmit={handleLogin} className="flex flex-col gap-5">
-          {/* Email Input */}
+        <form onSubmit={handleLogin} className="flex flex-col gap-4" noValidate>
           <div className="flex flex-col gap-1.5">
-            <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider pl-1">Usuario</label>
+            <label htmlFor="login-user" className="text-sm font-semibold text-on-surface">Usuario</label>
             <div className="relative">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/70" size={18} />
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" size={20} />
               <input
+                id="login-user"
                 type="text"
-                placeholder="Escribe tu usuario (ej: omarapp)"
+                inputMode="email"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="Ej: omarapp"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
-                className="w-full bg-white border border-outline-variant/50 rounded-2xl py-3.5 pl-11 pr-4 font-sans text-[15px] focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm transition-all text-on-surface disabled:opacity-50"
+                className="w-full min-h-14 bg-white border border-outline rounded-2xl pl-12 pr-4 font-sans text-base focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 transition-colors text-on-surface placeholder:text-on-surface-variant/60 disabled:opacity-60"
               />
             </div>
           </div>
 
-          {/* Password Input */}
           <div className="flex flex-col gap-1.5">
-            <label className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider pl-1">Contraseña</label>
+            <label htmlFor="login-pass" className="text-sm font-semibold text-on-surface">Contraseña</label>
             <div className="relative">
-              <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 ${error ? 'text-error' : 'text-on-surface-variant/70'}`} size={18} />
+              <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none ${error ? 'text-error' : 'text-on-surface-variant'}`} size={20} />
               <input
-                type="password"
-                placeholder="••••••••"
+                id="login-pass"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                placeholder="Tu contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
-                className={`w-full bg-white border rounded-2xl py-3.5 pl-11 pr-4 font-sans text-[15px] focus:outline-none focus:ring-2 shadow-sm transition-all text-on-surface disabled:opacity-50 ${
-                  error ? 'border-error border-2 focus:ring-error/20' : 'border-outline-variant/50 focus:ring-primary/20'
+                aria-invalid={!!error}
+                aria-describedby={error ? 'login-error' : undefined}
+                className={`w-full min-h-14 bg-white border rounded-2xl pl-12 pr-14 font-sans text-base focus:outline-none focus:ring-2 transition-colors text-on-surface placeholder:text-on-surface-variant/60 disabled:opacity-60 ${
+                  error ? 'border-error focus:ring-error/30' : 'border-outline focus:border-primary focus:ring-primary/30'
                 }`}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-12 w-12 flex items-center justify-center text-on-surface-variant rounded-full cursor-pointer"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
             </div>
             {error && (
-              <span className="text-[12px] text-error font-semibold pl-2 animate-in fade-in duration-200">{error}</span>
+              <p id="login-error" role="alert" className="text-sm text-error font-semibold">{error}</p>
             )}
           </div>
 
-          {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-primary text-white rounded-full py-4 font-sans text-[16px] font-semibold shadow-[0_8px_30px_rgba(62,158,87,0.2)] flex items-center justify-center gap-2 hover:scale-[0.99] active:scale-95 transition-transform disabled:opacity-50 mt-2 cursor-pointer"
+            className="w-full min-h-14 bg-primary-container text-on-primary rounded-2xl font-sans text-base font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60 mt-2 cursor-pointer"
           >
             {loading ? (
-              <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              <>
+                <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                <span>Entrando…</span>
+              </>
             ) : (
               <>
                 <LogIn size={20} />
-                <span>Iniciar Sesión</span>
+                <span>Entrar</span>
               </>
             )}
           </button>

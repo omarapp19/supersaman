@@ -9,10 +9,10 @@ interface RowActionButtonProps {
   size?: 'sm' | 'md';
 }
 
-/** Always-visible row action (edit/delete/etc) — 40x40 tap target, never hover-only. */
+/** Always-visible row action (edit/delete/etc) — 44x44 tap target, never hover-only. */
 export function RowActionButton({ icon: Icon, onClick, label, variant = 'default', size = 'md' }: RowActionButtonProps) {
-  const dims = size === 'sm' ? 'w-9 h-9 rounded-[10px]' : 'w-10 h-10 rounded-xl';
-  const iconSize = size === 'sm' ? 14 : 16;
+  const dims = 'w-11 h-11 rounded-xl';
+  const iconSize = 18;
   const colors = variant === 'danger'
     ? 'bg-error/10 text-error hover:bg-error/15'
     : 'bg-on-surface-variant/10 text-on-surface-variant hover:bg-on-surface-variant/15';

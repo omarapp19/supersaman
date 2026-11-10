@@ -54,7 +54,7 @@ export function Sidebar({ currentView, onNavigate, onLogout, user }: SidebarProp
               <div className="font-mono text-[13px] font-bold text-on-surface truncate" title={displayName}>
                 {displayName}
               </div>
-              <div className="font-mono text-[10px] text-on-surface-variant opacity-80 truncate uppercase tracking-wider">
+              <div className="font-sans font-semibold text-xs text-on-surface-variant opacity-80 truncate ">
                 {displayRole}
               </div>
             </div>
